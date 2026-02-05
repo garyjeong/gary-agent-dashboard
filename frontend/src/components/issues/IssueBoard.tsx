@@ -1,69 +1,111 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, forwardRef, useImperativeHandle } from 'react';
 import { useIssues } from '@/hooks';
 import { IssueColumn } from './IssueColumn';
 import { IssueModal } from './IssueModal';
 import { issueService } from '@/services/issueService';
 import type { Issue, IssueStatus, IssueCreate, IssueUpdate } from '@/types';
 
-const columns: { status: IssueStatus; title: string; color: string }[] = [
-  { status: 'todo', title: 'To Do', color: 'bg-gray-100' },
-  { status: 'in_progress', title: 'In Progress', color: 'bg-blue-100' },
-  { status: 'done', title: 'Done', color: 'bg-green-100' },
+const columns: { status: IssueStatus; title: string }[] = [
+  { status: 'todo', title: 'To Do' },
+  { status: 'in_progress', title: 'In Progress' },
+  { status: 'done', title: 'Done' },
 ];
 
-export function IssueBoard() {
+export interface IssueBoardRef {
+  openCreateModal: () => void;
+  refresh: () => void;
+}
+
+export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) {
   const { issues, isLoading, mutate } = useIssues();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIssue, setEditingIssue] = useState<Issue | null>(null);
-  
-  const handleCreate = async (data: IssueCreate) => {
-    await issueService.create(data);
+
+  useImperativeHandle(ref, () => ({
+    openCreateModal: () => setModalOpen(true),
+    refresh: () => mutate(),
+  }));
+
+  const handleCreate = async (data: IssueCreate | IssueUpdate) => {
+    await issueService.create(data as IssueCreate);
     mutate();
     setModalOpen(false);
   };
-  
-  const handleUpdate = async (id: number, data: IssueUpdate) => {
-    await issueService.update(id, data);
+
+  const handleUpdate = async (id: number, data: IssueCreate | IssueUpdate) => {
+    await issueService.update(id, data as IssueUpdate);
     mutate();
     setEditingIssue(null);
   };
-  
+
   const handleDelete = async (id: number) => {
     if (confirm('정말 삭제하시겠습니까?')) {
       await issueService.delete(id);
       mutate();
     }
   };
-  
+
   const handleWorkRequest = async (id: number) => {
     await issueService.createWorkRequest(id);
     alert('작업 요청이 큐에 등록되었습니다.');
     mutate();
   };
-  
+
   const handleStatusChange = async (issue: Issue, newStatus: IssueStatus) => {
     await issueService.update(issue.id, { status: newStatus });
     mutate();
   };
-  
+
+  // 통계 계산
+  const stats = {
+    total: issues.length,
+    todo: issues.filter((i) => i.status === 'todo').length,
+    inProgress: issues.filter((i) => i.status === 'in_progress').length,
+    done: issues.filter((i) => i.status === 'done').length,
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-primary-600" />
       </div>
     );
   }
-  
+
   return (
     <>
-      <div className="flex gap-6 h-full">
+      {/* 통계 헤더 */}
+      <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-900">전체</span>
+          <span className="text-sm text-gray-500">{stats.total}</span>
+        </div>
+        <div className="h-4 w-px bg-gray-200" />
+        <div className="flex items-center gap-4 text-xs text-gray-500">
+          <span>
+            <span className="inline-block w-2 h-2 rounded-full bg-gray-400 mr-1.5" />
+            To Do {stats.todo}
+          </span>
+          <span>
+            <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1.5" />
+            In Progress {stats.inProgress}
+          </span>
+          <span>
+            <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1.5" />
+            Done {stats.done}
+          </span>
+        </div>
+      </div>
+
+      {/* 칸반 보드 */}
+      <div className="flex gap-4 lg:gap-6 h-full overflow-x-auto pb-4">
         {columns.map((column) => (
           <IssueColumn
             key={column.status}
             title={column.title}
-            color={column.color}
+            status={column.status}
             issues={issues.filter((issue) => issue.status === column.status)}
             onEdit={setEditingIssue}
             onDelete={handleDelete}
@@ -72,15 +114,7 @@ export function IssueBoard() {
           />
         ))}
       </div>
-      
-      {/* 생성 버튼 (플로팅) */}
-      <button
-        onClick={() => setModalOpen(true)}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg hover:bg-primary-700 transition-colors flex items-center justify-center text-2xl"
-      >
-        +
-      </button>
-      
+
       {/* 생성 모달 */}
       {modalOpen && (
         <IssueModal
@@ -88,7 +122,7 @@ export function IssueBoard() {
           onSubmit={handleCreate}
         />
       )}
-      
+
       {/* 수정 모달 */}
       {editingIssue && (
         <IssueModal
@@ -99,4 +133,4 @@ export function IssueBoard() {
       )}
     </>
   );
-}
+});
