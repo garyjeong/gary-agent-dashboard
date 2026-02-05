@@ -138,6 +138,56 @@ gary-agent-dashboard/
 
 ---
 
-## 7. 참고 문서
+## 7. 로컬 워커 실행 가이드
+
+로컬 워커는 백엔드의 작업 큐를 폴링하여 에이전트(Claude Code/Cursor)로 작업을 처리합니다.
+
+### 7.1 설치
+
+```bash
+cd worker
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+### 7.2 설정 (.env)
+
+```bash
+# 백엔드 API URL
+API_BASE_URL=http://localhost:8000
+
+# 폴링 간격 (초)
+POLL_INTERVAL=5
+
+# 에이전트 타입: claude_code 또는 cursor
+AGENT_TYPE=claude_code
+
+# 작업 디렉토리 (리포 클론 위치)
+WORK_DIR=./workspaces
+```
+
+### 7.3 실행
+
+```bash
+cd worker
+source venv/bin/activate
+python main.py
+```
+
+### 7.4 동작 흐름
+
+1. 워커가 `GET /api/queue/next`를 주기적으로 폴링
+2. 대기 중인 작업이 있으면 가져옴 (상태가 `in_progress`로 변경)
+3. 리포지토리가 지정된 경우 클론/풀
+4. 에이전트(Claude Code/Cursor)에게 작업 프롬프트 전달
+5. 완료 후 `PATCH /api/queue/{id}`로 결과 업데이트
+6. 백엔드가 텔레그램 알림 발송
+
+---
+
+## 8. 참고 문서
 
 - [PROJECT.md](./PROJECT.md) — 프로젝트 목적, 기능 정의, 구현 방식 상세.
+- [TODO.md](./TODO.md) — 구현 진행 상황 및 체크리스트.

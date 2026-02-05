@@ -1,0 +1,8 @@
+# HTTP Client
+httpx==0.26.0
+
+# Environment
+python-dotenv==1.0.0
+
+# Async
+asyncio-atexit==1.0.1

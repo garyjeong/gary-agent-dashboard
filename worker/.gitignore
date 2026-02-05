@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Environment
+.env
+
+# Workspaces (클론된 리포)
+workspaces/
+
+# IDE
+.idea/
+.vscode/
