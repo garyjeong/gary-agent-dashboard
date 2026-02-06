@@ -202,10 +202,10 @@
 ## 8. 테스트 (MEDIUM Priority)
 
 ### 8.1 백엔드 테스트
-- [ ] `requirements-dev.txt` 생성 (pytest, pytest-asyncio)
-- [ ] `tests/test_issue_service.py` 작성
-- [ ] `tests/test_queue_service.py` 작성
-- [ ] `tests/test_auth.py` 작성
+- [x] `requirements-dev.txt` 생성 (pytest, pytest-asyncio)
+- [x] `tests/test_issue_service.py` 작성
+- [x] `tests/test_queue_service.py` 작성
+- [x] `tests/test_auth.py` 작성
 
 ### 8.2 프론트엔드 테스트
 - [ ] Jest + React Testing Library 설정
