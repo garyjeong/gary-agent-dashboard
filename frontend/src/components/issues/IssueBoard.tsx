@@ -1,8 +1,20 @@
 'use client';
 
 import { useState, forwardRef, useImperativeHandle } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  closestCorners,
+  type DragStartEvent,
+  type DragEndEvent,
+} from '@dnd-kit/core';
 import { useIssues } from '@/hooks';
 import { IssueColumn } from './IssueColumn';
+import { IssueCard } from './IssueCard';
 import { IssueModal } from './IssueModal';
 import { issueService } from '@/services/issueService';
 import type { Issue, IssueStatus, IssueCreate, IssueUpdate } from '@/types';
@@ -22,6 +34,13 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
   const { issues, isLoading, mutate } = useIssues();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIssue, setEditingIssue] = useState<Issue | null>(null);
+  const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+
+  // 드래그 센서: 포인터(마우스) + 터치
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  );
 
   useImperativeHandle(ref, () => ({
     openCreateModal: () => setModalOpen(true),
@@ -55,6 +74,30 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
 
   const handleStatusChange = async (issue: Issue, newStatus: IssueStatus) => {
     await issueService.update(issue.id, { status: newStatus });
+    mutate();
+  };
+
+  // 드래그 시작
+  const handleDragStart = (event: DragStartEvent) => {
+    const issue = issues.find((i) => i.id === Number(event.active.id));
+    setActiveIssue(issue ?? null);
+  };
+
+  // 드래그 종료 → 상태 변경
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveIssue(null);
+
+    if (!over) return;
+
+    const issueId = Number(active.id);
+    const newStatus = String(over.id) as IssueStatus;
+    const issue = issues.find((i) => i.id === issueId);
+
+    if (!issue || issue.status === newStatus) return;
+
+    // 상태 변경
+    await issueService.update(issueId, { status: newStatus });
     mutate();
   };
 
@@ -99,21 +142,43 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
         </div>
       </div>
 
-      {/* 칸반 보드 */}
-      <div className="flex gap-4 lg:gap-6 h-full overflow-x-auto pb-4">
-        {columns.map((column) => (
-          <IssueColumn
-            key={column.status}
-            title={column.title}
-            status={column.status}
-            issues={issues.filter((issue) => issue.status === column.status)}
-            onEdit={setEditingIssue}
-            onDelete={handleDelete}
-            onWorkRequest={handleWorkRequest}
-            onStatusChange={handleStatusChange}
-          />
-        ))}
-      </div>
+      {/* 칸반 보드 (DnD) */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex gap-4 lg:gap-6 h-full overflow-x-auto pb-4">
+          {columns.map((column) => (
+            <IssueColumn
+              key={column.status}
+              title={column.title}
+              status={column.status}
+              issues={issues.filter((issue) => issue.status === column.status)}
+              onEdit={setEditingIssue}
+              onDelete={handleDelete}
+              onWorkRequest={handleWorkRequest}
+              onStatusChange={handleStatusChange}
+            />
+          ))}
+        </div>
+
+        {/* 드래그 오버레이 (드래그 중 표시되는 카드) */}
+        <DragOverlay>
+          {activeIssue ? (
+            <div className="opacity-90 shadow-lg rotate-2">
+              <IssueCard
+                issue={activeIssue}
+                onEdit={() => {}}
+                onDelete={() => {}}
+                onWorkRequest={() => {}}
+                onStatusChange={() => {}}
+              />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* 생성 모달 */}
       {modalOpen && (

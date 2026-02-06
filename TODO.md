@@ -66,11 +66,11 @@
 ## 3. 핵심 기능 (HIGH Priority)
 
 ### 3.1 드래그 앤 드롭
-- [ ] 일감 카드 드래그로 상태 변경 (To Do → In Progress → Done)
-- [ ] @dnd-kit/core 또는 react-beautiful-dnd 사용
-- [ ] 드래그 중 시각적 피드백 (그림자, 투명도)
-- [ ] 터치 디바이스 지원
-- **파일**: `frontend/src/components/issues/IssueBoard.tsx`, `frontend/src/components/issues/IssueColumn.tsx`
+- [x] 일감 카드 드래그로 상태 변경 (To Do → In Progress → Done)
+- [x] @dnd-kit/core 사용
+- [x] 드래그 중 시각적 피드백 (오버레이, 투명도, 드롭존 하이라이트)
+- [x] 터치 디바이스 지원 (TouchSensor)
+- **파일**: `frontend/src/components/issues/IssueBoard.tsx`, `IssueColumn.tsx`, `IssueCard.tsx`
 
 ### 3.2 라벨/태그 시스템
 - [x] 백엔드: `labels` 테이블 생성 (id, name, color)

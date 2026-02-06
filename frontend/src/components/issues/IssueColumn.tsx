@@ -1,5 +1,7 @@
 'use client';
 
+import { useDroppable } from '@dnd-kit/core';
+import { clsx } from 'clsx';
 import { IssueCard } from './IssueCard';
 import { Inbox } from 'lucide-react';
 import type { Issue, IssueStatus } from '@/types';
@@ -29,6 +31,8 @@ export function IssueColumn({
   onWorkRequest,
   onStatusChange,
 }: IssueColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({ id: status });
+
   return (
     <div className="flex-1 min-w-[280px] max-w-[360px] flex flex-col">
       {/* 컬럼 헤더 */}
@@ -40,8 +44,14 @@ export function IssueColumn({
         </span>
       </div>
 
-      {/* 카드 목록 */}
-      <div className="flex-1 space-y-2 min-h-[200px] pt-1">
+      {/* 카드 목록 (드롭 영역) */}
+      <div
+        ref={setNodeRef}
+        className={clsx(
+          'flex-1 space-y-2 min-h-[200px] pt-1 rounded-lg transition-colors',
+          isOver && 'bg-primary-50 ring-2 ring-primary-200 ring-inset',
+        )}
+      >
         {issues.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-400">
             <Inbox className="w-8 h-8 mb-2 opacity-50" />

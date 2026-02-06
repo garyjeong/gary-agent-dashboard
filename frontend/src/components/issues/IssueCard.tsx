@@ -1,7 +1,8 @@
 'use client';
 
-import { MoreVertical, Play, Pencil, Trash2, GitBranch } from 'lucide-react';
+import { MoreVertical, Play, Pencil, Trash2, GitBranch, GripVertical } from 'lucide-react';
 import { useState } from 'react';
+import { useDraggable } from '@dnd-kit/core';
 import { clsx } from 'clsx';
 import type { Issue, IssueStatus } from '@/types';
 import { Badge } from '@/components/ui';
@@ -36,9 +37,22 @@ export function IssueCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: issue.id,
+  });
+
+  const style = transform
+    ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
+    : undefined;
+
   return (
     <div
-      className="group relative bg-white rounded-md border border-gray-200 hover:border-gray-300 transition-all"
+      ref={setNodeRef}
+      style={style}
+      className={clsx(
+        'group relative bg-white rounded-md border border-gray-200 hover:border-gray-300 transition-all',
+        isDragging && 'opacity-40 shadow-none',
+      )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -61,8 +75,19 @@ export function IssueCard({
           </div>
         )}
 
-        {/* 헤더: 제목 + 메뉴 */}
+        {/* 헤더: 드래그 핸들 + 제목 + 메뉴 */}
         <div className="flex items-start justify-between gap-2">
+          <button
+            {...attributes}
+            {...listeners}
+            className={clsx(
+              'mt-0.5 p-0.5 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing rounded transition-opacity touch-none',
+              isHovered || isDragging ? 'opacity-100' : 'opacity-0'
+            )}
+            aria-label="드래그하여 이동"
+          >
+            <GripVertical className="w-3.5 h-3.5" />
+          </button>
           <h4 className="text-sm font-medium text-gray-900 leading-snug flex-1">
             {issue.title}
           </h4>
