@@ -18,6 +18,7 @@ from src.schemas.issue import (
     IssueListResponse,
 )
 from src.schemas.queue import QueueItemResponse
+from src.models.issue import Issue as IssueModel
 
 router = APIRouter(prefix="/api/issues", tags=["issues"])
 
@@ -58,6 +59,20 @@ async def get_issues(
         limit=limit,
     )
     return IssueListResponse(items=items, total=total)
+
+
+@router.get("/repos", response_model=List[str])
+async def get_repos(
+    db: AsyncSession = Depends(get_db),
+):
+    """일감에 등록된 고유 리포지토리 목록 조회"""
+    result = await db.execute(
+        select(IssueModel.repo_full_name)
+        .where(IssueModel.repo_full_name.isnot(None))
+        .distinct()
+        .order_by(IssueModel.repo_full_name)
+    )
+    return [row for row in result.scalars().all()]
 
 
 @router.get("/{issue_id}", response_model=IssueResponse)

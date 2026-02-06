@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, forwardRef, useImperativeHandle } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   DndContext,
   DragOverlay,
@@ -12,7 +13,10 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
+import useSWR from 'swr';
+import { GitBranch } from 'lucide-react';
 import { useIssues } from '@/hooks';
+import { fetcher } from '@/lib/fetcher';
 import { IssueColumn } from './IssueColumn';
 import { IssueCard } from './IssueCard';
 import { IssueModal } from './IssueModal';
@@ -32,7 +36,12 @@ export interface IssueBoardRef {
 }
 
 export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) {
-  const { issues, isLoading, mutate } = useIssues();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const repoFilter = searchParams.get('repo') || undefined;
+
+  const { data: repos } = useSWR<string[]>('/api/issues/repos', fetcher);
+  const { issues, isLoading, mutate } = useIssues({ repo_full_name: repoFilter });
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIssue, setEditingIssue] = useState<Issue | null>(null);
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
@@ -48,6 +57,17 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
     openCreateModal: () => setModalOpen(true),
     refresh: () => mutate(),
   }));
+
+  const handleRepoChange = (repo: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (repo) {
+      params.set('repo', repo);
+    } else {
+      params.delete('repo');
+    }
+    const query = params.toString();
+    router.push(query ? `?${query}` : '/');
+  };
 
   const handleCreate = async (data: IssueCreate | IssueUpdate) => {
     await issueService.create(data as IssueCreate);
@@ -121,27 +141,48 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
 
   return (
     <>
-      {/* 통계 헤더 */}
-      <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-900">전체</span>
-          <span className="text-sm text-gray-500">{stats.total}</span>
+      {/* 통계 헤더 + 리포 필터 */}
+      <div className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-900">전체</span>
+            <span className="text-sm text-gray-500">{stats.total}</span>
+          </div>
+          <div className="h-4 w-px bg-gray-200" />
+          <div className="flex items-center gap-4 text-xs text-gray-500">
+            <span>
+              <span className="inline-block w-2 h-2 rounded-full bg-gray-400 mr-1.5" />
+              To Do {stats.todo}
+            </span>
+            <span>
+              <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1.5" />
+              In Progress {stats.inProgress}
+            </span>
+            <span>
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1.5" />
+              Done {stats.done}
+            </span>
+          </div>
         </div>
-        <div className="h-4 w-px bg-gray-200" />
-        <div className="flex items-center gap-4 text-xs text-gray-500">
-          <span>
-            <span className="inline-block w-2 h-2 rounded-full bg-gray-400 mr-1.5" />
-            To Do {stats.todo}
-          </span>
-          <span>
-            <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1.5" />
-            In Progress {stats.inProgress}
-          </span>
-          <span>
-            <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1.5" />
-            Done {stats.done}
-          </span>
-        </div>
+
+        {/* 리포지토리 필터 */}
+        {repos && repos.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <GitBranch className="w-3.5 h-3.5 text-gray-400" />
+            <select
+              value={repoFilter || ''}
+              onChange={(e) => handleRepoChange(e.target.value)}
+              className="text-xs text-gray-600 bg-white border border-gray-200 rounded-md px-2 py-1 pr-6 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">모든 리포지토리</option>
+              {repos.map((repo) => (
+                <option key={repo} value={repo}>
+                  {repo}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* 칸반 보드 (DnD) */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
@@ -37,7 +37,13 @@ export default function Home() {
           onRefresh={() => issueBoardRef.current?.refresh()}
         />
         <main className="flex-1 overflow-auto p-4 lg:p-6">
-          <IssueBoard ref={issueBoardRef} />
+          <Suspense fallback={
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-primary-600" />
+            </div>
+          }>
+            <IssueBoard ref={issueBoardRef} />
+          </Suspense>
         </main>
       </div>
     </div>
