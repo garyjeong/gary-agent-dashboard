@@ -300,15 +300,15 @@
 - **파일**: `backend/src/models/issue.py`, `backend/src/schemas/issue.py`, `frontend/src/components/issues/IssueModal.tsx`
 
 ### 11.2 댓글/활동 이력
-- [ ] 댓글(comments) 테이블 생성
-- [ ] 댓글 CRUD API
-- [ ] 프론트엔드: 댓글 입력/표시 UI (상세 모달 내)
+- [x] 댓글(comments) 테이블 생성
+- [x] 댓글 CRUD API
+- [x] 프론트엔드: 댓글 입력/표시 UI (상세 모달 내)
 - **파일**: `backend/src/models/comment.py` (신규), `backend/src/routes/comments.py` (신규)
 
 ### 11.3 GitHub 이슈 동기화
-- [ ] `GET /api/github/repos/{owner}/{repo}/issues` 엔드포인트
-- [ ] GitHub 이슈 ↔ 대시보드 일감 연결 매핑
-- [ ] 양방향 동기화 로직
+- [x] `GET /api/github/repos/{owner}/{repo}/issues` 엔드포인트
+- [x] GitHub 이슈 → 대시보드 일감 가져오기 (import)
+- [x] GitHub 이슈 목록 조회 + 가져오기 UI
 - **파일**: `backend/src/routes/github.py`, `backend/src/services/github_service.py`
 
 ### 11.4 전용 페이지 구현

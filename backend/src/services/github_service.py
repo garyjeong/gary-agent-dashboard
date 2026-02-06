@@ -201,6 +201,74 @@ class GitHubAPIService:
             detail="리포지토리 트리 조회 실패"
         )
 
+    async def get_repo_issues(self, owner: str, repo: str, state: str = "open") -> list:
+        """리포지토리 이슈 목록 조회"""
+        self._validate_owner_repo(owner, repo)
+
+        url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/issues"
+        response = await request_with_retry(
+            "GET",
+            url,
+            headers=self.headers,
+            params={"state": state, "per_page": 30, "sort": "updated"},
+        )
+
+        if response.status_code == 404:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="리포지토리를 찾을 수 없습니다",
+            )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail="이슈 목록 조회 실패",
+            )
+
+        # GitHub API는 이슈 엔드포인트에서 PR도 반환하므로 필터링
+        return [
+            {
+                "number": issue["number"],
+                "title": issue["title"],
+                "state": issue["state"],
+                "html_url": issue["html_url"],
+                "user": {
+                    "login": issue["user"]["login"],
+                    "avatar_url": issue["user"]["avatar_url"],
+                },
+                "labels": [
+                    {"name": l["name"], "color": l["color"]}
+                    for l in issue.get("labels", [])
+                ],
+                "body": issue.get("body"),
+                "created_at": issue["created_at"],
+                "updated_at": issue["updated_at"],
+            }
+            for issue in response.json()
+            if "pull_request" not in issue
+        ]
+
+    async def get_single_issue(self, owner: str, repo: str, issue_number: int) -> dict:
+        """리포지토리 단일 이슈 조회"""
+        self._validate_owner_repo(owner, repo)
+
+        url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/issues/{issue_number}"
+        response = await request_with_retry("GET", url, headers=self.headers)
+
+        if response.status_code == 404:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="이슈를 찾을 수 없습니다",
+            )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail="이슈 조회 실패",
+            )
+
+        return response.json()
+
     def _validate_owner_repo(self, owner: str, repo: str) -> None:
         """owner/repo 입력값 검증"""
         pattern = r"^[A-Za-z0-9_.-]+$"

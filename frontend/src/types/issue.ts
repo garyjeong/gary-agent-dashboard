@@ -59,3 +59,12 @@ export interface IssueListResponse {
   items: Issue[];
   total: number;
 }
+
+export interface Comment {
+  id: number;
+  issue_id: number;
+  author: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}

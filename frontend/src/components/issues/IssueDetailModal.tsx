@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import useSWR from 'swr';
 import { X, GitBranch, ExternalLink, Clock, CheckCircle, XCircle, Loader2, AlertCircle, User, Calendar } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { clsx } from 'clsx';
 import { Badge, Button, useToast } from '@/components/ui';
 import { issueService } from '@/services/issueService';
+import { fetcher, fetcherWithOptions } from '@/lib/fetcher';
 import { formatRelativeTime } from '@/lib/timeUtils';
-import type { Issue, QueueItem } from '@/types';
+import type { Issue, QueueItem, Comment } from '@/types';
 
 interface IssueDetailModalProps {
   issue: Issue;
@@ -31,7 +33,34 @@ export function IssueDetailModal({ issue, onClose, onEdit }: IssueDetailModalPro
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [editingBehavior, setEditingBehavior] = useState(false);
   const [behaviorDraft, setBehaviorDraft] = useState(issue.behavior_example || '');
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
   const toast = useToast();
+
+  // 댓글 조회
+  const {
+    data: comments,
+    isLoading: loadingComments,
+    mutate: mutateComments,
+  } = useSWR<Comment[]>(`/api/issues/${issue.id}/comments`, fetcher);
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || submittingComment) return;
+    setSubmittingComment(true);
+    try {
+      await fetcherWithOptions<Comment>(`/api/issues/${issue.id}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ content: newComment.trim() }),
+      });
+      setNewComment('');
+      mutateComments();
+      toast.success('댓글이 추가되었습니다.');
+    } catch {
+      toast.error('댓글 추가에 실패했습니다.');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
 
   const handleSaveBehavior = async () => {
     try {
@@ -247,6 +276,56 @@ export function IssueDetailModal({ issue, onClose, onEdit }: IssueDetailModalPro
                 })}
               </div>
             )}
+          </div>
+
+          {/* 댓글 */}
+          <div className="px-6 pb-6 border-t border-gray-100 pt-4">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">댓글</h4>
+
+            {/* 댓글 목록 */}
+            {loadingComments ? (
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                로딩 중...
+              </div>
+            ) : comments && comments.length > 0 ? (
+              <div className="space-y-3">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="p-3 bg-gray-50 rounded-md">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-gray-700">{comment.author}</span>
+                      <span className="text-[10px] text-gray-400">{formatRelativeTime(comment.created_at)}</span>
+                    </div>
+                    <p className="text-sm text-gray-600 whitespace-pre-wrap">{comment.content}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-gray-400 mb-3">
+                <AlertCircle className="w-3 h-3" />
+                댓글이 없습니다.
+              </div>
+            )}
+
+            {/* 댓글 입력 */}
+            <div className="mt-3">
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                rows={2}
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
+                placeholder="댓글을 입력하세요..."
+              />
+              <div className="flex justify-end mt-1">
+                <button
+                  onClick={handleAddComment}
+                  disabled={!newComment.trim() || submittingComment}
+                  className="text-xs px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {submittingComment ? '추가 중...' : '댓글 추가'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

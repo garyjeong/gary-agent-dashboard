@@ -5,7 +5,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/fetcher';
-import { GitBranch, ExternalLink, Star, Lock, Calendar } from 'lucide-react';
+import { GitBranch, ExternalLink, Star, Lock, Calendar, X, Download, CircleDot, Loader2 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { formatRelativeTime } from '@/lib/timeUtils';
 import { clsx } from 'clsx';
@@ -25,6 +25,29 @@ interface GithubRepo {
   default_branch: string;
   updated_at: string | null;
   stargazers_count?: number;
+}
+
+/**
+ * GitHub 이슈 타입
+ */
+interface GitHubIssueLabel {
+  name: string;
+  color: string;
+}
+
+interface GitHubIssue {
+  number: number;
+  title: string;
+  state: string;
+  html_url: string;
+  user: {
+    login: string;
+    avatar_url: string;
+  };
+  labels: GitHubIssueLabel[];
+  body: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 /**
@@ -70,14 +93,25 @@ function RepoCardSkeleton() {
 /**
  * 리포지토리 카드 컴포넌트
  */
-function RepoCard({ repo }: { repo: GithubRepo }) {
+function RepoCard({
+  repo,
+  isSelected,
+  onSelect,
+}: {
+  repo: GithubRepo;
+  isSelected: boolean;
+  onSelect: (fullName: string) => void;
+}) {
   const languageColor = repo.language ? languageColors[repo.language] : '#8b949e';
 
   return (
     <Card
       hover
-      className="p-5 transition-all"
-      onClick={() => window.open(repo.html_url, '_blank', 'noopener,noreferrer')}
+      className={clsx(
+        'p-5 transition-all',
+        isSelected && 'ring-2 ring-primary-500 border-primary-500'
+      )}
+      onClick={() => onSelect(repo.full_name)}
     >
       {/* 상단: 이름 + 공개/비공개 + 외부 링크 */}
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -92,7 +126,15 @@ function RepoCard({ repo }: { repo: GithubRepo }) {
             </span>
           )}
         </div>
-        <ExternalLink className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+        <a
+          href={repo.html_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="text-gray-400 hover:text-gray-600 flex-shrink-0 mt-0.5"
+        >
+          <ExternalLink className="w-4 h-4" />
+        </a>
       </div>
 
       {/* 설명 */}
@@ -140,11 +182,175 @@ function RepoCard({ repo }: { repo: GithubRepo }) {
 }
 
 /**
+ * GitHub 이슈 목록 패널
+ */
+function IssueListPanel({
+  repoFullName,
+  onClose,
+}: {
+  repoFullName: string;
+  onClose: () => void;
+}) {
+  const [importingIssue, setImportingIssue] = useState<number | null>(null);
+  const [importedIssues, setImportedIssues] = useState<Set<number>>(new Set());
+
+  const [owner, repo] = repoFullName.split('/');
+  const { data: issues, isLoading, error } = useSWR<GitHubIssue[]>(
+    `/api/github/repos/${owner}/${repo}/issues`,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  const importIssue = async (issueNumber: number) => {
+    setImportingIssue(issueNumber);
+    try {
+      const res = await fetch(
+        `/api/github/repos/${owner}/${repo}/issues/${issueNumber}/import`,
+        { method: 'POST' }
+      );
+      if (res.ok) {
+        setImportedIssues((prev) => new Set(prev).add(issueNumber));
+      } else {
+        const data = await res.json().catch(() => ({ detail: '가져오기 실패' }));
+        alert(data.detail || '가져오기 실패');
+      }
+    } catch {
+      alert('네트워크 오류가 발생했습니다');
+    } finally {
+      setImportingIssue(null);
+    }
+  };
+
+  return (
+    <Card className="mt-6">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <CircleDot className="w-4 h-4 text-green-600" />
+          <h3 className="text-sm font-semibold text-gray-800">
+            {repoFullName} 이슈
+          </h3>
+          {issues && (
+            <span className="text-xs text-gray-400">
+              ({issues.length}건)
+            </span>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* 로딩 */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-8 text-gray-400">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+          <span className="text-sm">이슈를 불러오는 중...</span>
+        </div>
+      )}
+
+      {/* 에러 */}
+      {error && !isLoading && (
+        <div className="px-5 py-6 text-center">
+          <p className="text-sm text-red-500">
+            이슈를 불러올 수 없습니다.
+          </p>
+        </div>
+      )}
+
+      {/* 빈 상태 */}
+      {!isLoading && !error && issues && issues.length === 0 && (
+        <div className="px-5 py-8 text-center">
+          <p className="text-sm text-gray-500">
+            열린 이슈가 없습니다.
+          </p>
+        </div>
+      )}
+
+      {/* 이슈 목록 */}
+      {!isLoading && issues && issues.length > 0 && (
+        <div className="divide-y divide-gray-100">
+          {issues.map((issue) => (
+            <div
+              key={issue.number}
+              className="flex items-center justify-between py-2.5 px-5 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <CircleDot className={clsx(
+                  'w-3.5 h-3.5 flex-shrink-0',
+                  issue.state === 'open' ? 'text-green-600' : 'text-purple-600'
+                )} />
+                <span className="text-xs text-gray-400 flex-shrink-0">
+                  #{issue.number}
+                </span>
+                <a
+                  href={issue.html_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-800 hover:text-primary-600 truncate"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {issue.title}
+                </a>
+                {issue.labels.map((l) => (
+                  <span
+                    key={l.name}
+                    className="text-2xs px-1.5 py-0.5 rounded flex-shrink-0"
+                    style={{
+                      backgroundColor: `#${l.color}20`,
+                      color: `#${l.color}`,
+                    }}
+                  >
+                    {l.name}
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                <span className="text-2xs text-gray-400">
+                  {formatRelativeTime(issue.updated_at)}
+                </span>
+                {importedIssues.has(issue.number) ? (
+                  <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded">
+                    가져옴
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => importIssue(issue.number)}
+                    disabled={importingIssue === issue.number}
+                    className={clsx(
+                      'inline-flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors',
+                      importingIssue === issue.number
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-primary-600 text-white hover:bg-primary-700'
+                    )}
+                  >
+                    {importingIssue === issue.number ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Download className="w-3 h-3" />
+                    )}
+                    가져오기
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/**
  * GitHub 연동 페이지
  * 사용자의 리포지토리 목록을 표시합니다.
  */
 export default function GitHubPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
   const { data: repos, isLoading, error, mutate } = useSWR<GithubRepo[]>(
     '/api/github/repos',
     fetcher,
@@ -152,6 +358,10 @@ export default function GitHubPage() {
       revalidateOnFocus: false,
     }
   );
+
+  const handleRepoSelect = (fullName: string) => {
+    setSelectedRepo((prev) => (prev === fullName ? null : fullName));
+  };
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -170,7 +380,7 @@ export default function GitHubPage() {
                 리포지토리 목록
               </h1>
               <p className="text-sm text-gray-500">
-                연결된 GitHub 계정의 리포지토리를 확인하세요.
+                리포지토리를 클릭하면 이슈 목록을 확인하고 대시보드로 가져올 수 있습니다.
               </p>
             </div>
 
@@ -229,9 +439,22 @@ export default function GitHubPage() {
             {!isLoading && repos && repos.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {repos.map((repo) => (
-                  <RepoCard key={repo.id} repo={repo} />
+                  <RepoCard
+                    key={repo.id}
+                    repo={repo}
+                    isSelected={selectedRepo === repo.full_name}
+                    onSelect={handleRepoSelect}
+                  />
                 ))}
               </div>
+            )}
+
+            {/* 이슈 목록 패널 */}
+            {selectedRepo && (
+              <IssueListPanel
+                repoFullName={selectedRepo}
+                onClose={() => setSelectedRepo(null)}
+              />
             )}
           </div>
         </main>

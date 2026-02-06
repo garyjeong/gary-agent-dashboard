@@ -69,3 +69,10 @@ class Issue(Base):
         secondary=issue_labels,
         lazy="selectin",
     )
+    comments: Mapped[List["Comment"]] = relationship(
+        "Comment",
+        back_populates="issue",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="Comment.created_at",
+    )

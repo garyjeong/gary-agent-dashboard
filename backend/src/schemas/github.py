@@ -32,3 +32,28 @@ class RepoTreeResponse(BaseModel):
     sha: str
     truncated: bool
     tree: List[TreeItemResponse]
+
+
+class IssueLabelResponse(BaseModel):
+    """GitHub 이슈 라벨"""
+    name: str
+    color: str
+
+
+class IssueUserResponse(BaseModel):
+    """GitHub 이슈 작성자"""
+    login: str
+    avatar_url: str
+
+
+class GitHubIssueResponse(BaseModel):
+    """GitHub 이슈 응답"""
+    number: int
+    title: str
+    state: str
+    html_url: str
+    user: IssueUserResponse
+    labels: List[IssueLabelResponse]
+    body: Optional[str] = None
+    created_at: str
+    updated_at: str
