@@ -58,7 +58,7 @@ def _clear_auth_cookies(response: Response) -> None:
 
 @router.get("/github", response_model=AuthURLResponse)
 async def github_login(
-    redirect_uri: str = Query(default="http://localhost:3000/auth/callback"),
+    redirect_uri: str = Query(default="http://localhost:5555/auth/callback"),
     service: GitHubService = Depends(get_github_service),
 ):
     """GitHub OAuth 로그인 URL 반환"""
@@ -75,7 +75,7 @@ async def github_callback(
     access_token = await service.exchange_code_for_token(code)
     user = await service.get_or_create_user(access_token)
 
-    response = RedirectResponse(url="http://localhost:3000", status_code=302)
+    response = RedirectResponse(url="http://localhost:5555", status_code=302)
     _set_auth_cookies(response, user.id)
     return response
 

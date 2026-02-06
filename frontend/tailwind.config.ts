@@ -8,6 +8,9 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['NoonnuBasicGothic', 'system-ui', '-apple-system', 'sans-serif'],
+      },
       colors: {
         // Neutral Gray (Linear 스타일)
         gray: {
