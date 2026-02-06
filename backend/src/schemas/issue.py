@@ -86,6 +86,7 @@ class IssueResponse(IssueBase):
     id: int
     labels: List[LabelResponse] = []
     latest_queue_status: Optional[str] = None
+    pr_status: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

@@ -23,11 +23,13 @@ router = APIRouter(prefix="/api/issues", tags=["issues"])
 
 
 def _enrich_issue_response(issue) -> IssueResponse:
-    """Add latest_queue_status to issue response"""
+    """Add latest_queue_status and pr_status to issue response"""
     response = IssueResponse.model_validate(issue)
     if issue.queue_items:
         latest = max(issue.queue_items, key=lambda q: q.created_at)
         response.latest_queue_status = latest.status.value
+    if issue.pr_status:
+        response.pr_status = issue.pr_status
     return response
 
 
@@ -47,16 +49,23 @@ async def get_issues(
     priority: Optional[IssuePriority] = None,
     repo: Optional[str] = Query(None, alias="repo_full_name"),
     search: Optional[str] = Query(None, min_length=1, max_length=200),
+    label_ids: Optional[str] = Query(None, description="라벨 ID 목록 (쉼표 구분)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     service: IssueService = Depends(get_issue_service),
 ):
     """일감 목록 조회 (필터링 + 검색)"""
+    parsed_label_ids = (
+        [int(x) for x in label_ids.split(",") if x.strip()]
+        if label_ids
+        else None
+    )
     items, total = await service.get_issues(
         status_filter=status,
         priority=priority,
         repo_full_name=repo,
         search=search,
+        label_ids=parsed_label_ids,
         skip=skip,
         limit=limit,
     )

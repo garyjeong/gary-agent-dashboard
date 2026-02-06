@@ -32,12 +32,19 @@ class IssueRepository:
         priority: Optional[IssuePriority] = None,
         repo_full_name: Optional[str] = None,
         search: Optional[str] = None,
+        label_ids: Optional[List[int]] = None,
         skip: int = 0,
         limit: int = 50,
     ) -> Tuple[List[Issue], int]:
         """일감 목록 조회 (필터링, 검색, 페이징)"""
         query = select(Issue)
         count_query = select(func.count(Issue.id))
+
+        # 라벨 필터 (다대다 조인)
+        if label_ids:
+            from src.models.label import issue_labels
+            query = query.join(issue_labels).where(issue_labels.c.label_id.in_(label_ids))
+            count_query = count_query.join(issue_labels).where(issue_labels.c.label_id.in_(label_ids))
 
         # 필터 조건 빌드
         conditions = []

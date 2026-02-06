@@ -16,4 +16,6 @@ export type { SelectProps } from './Select';
 export { Modal } from './Modal';
 export type { ModalProps } from './Modal';
 
+export { Pagination } from './Pagination';
+
 export { ToastProvider, useToast } from './Toast';

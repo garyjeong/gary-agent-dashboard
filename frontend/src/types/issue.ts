@@ -19,6 +19,7 @@ export interface Issue {
   priority: IssuePriority;
   repo_full_name: string | null;
   pr_url: string | null;
+  pr_status: string | null;
   behavior_example: string | null;
   labels: Label[];
   latest_queue_status: string | null;

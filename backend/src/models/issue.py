@@ -41,6 +41,7 @@ class Issue(Base):
     )
     repo_full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     pr_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    pr_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # open, merged, closed
     behavior_example: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, 

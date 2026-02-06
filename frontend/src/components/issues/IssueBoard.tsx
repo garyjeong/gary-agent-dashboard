@@ -14,14 +14,16 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import useSWR from 'swr';
+import clsx from 'clsx';
 import { GitBranch, Search } from 'lucide-react';
-import { useIssues } from '@/hooks';
+import { useIssues, useLabels } from '@/hooks';
+import { useFilterStore } from '@/lib/store';
 import { fetcher } from '@/lib/fetcher';
 import { IssueColumn } from './IssueColumn';
 import { IssueCard } from './IssueCard';
 import { IssueModal } from './IssueModal';
 import { IssueDetailModal } from './IssueDetailModal';
-import { useToast } from '@/components/ui';
+import { useToast, Pagination } from '@/components/ui';
 import { issueService } from '@/services/issueService';
 import type { Issue, IssueStatus, IssueCreate, IssueUpdate } from '@/types';
 
@@ -31,6 +33,8 @@ const columns: { status: IssueStatus; title: string }[] = [
   { status: 'done', title: 'Done' },
 ];
 
+const ITEMS_PER_PAGE = 20;
+
 export interface IssueBoardRef {
   openCreateModal: () => void;
   refresh: () => void;
@@ -39,23 +43,25 @@ export interface IssueBoardRef {
 export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const repoFilter = searchParams.get('repo') || undefined;
-  const searchQuery = searchParams.get('q') || '';
-  const [searchInput, setSearchInput] = useState(searchQuery);
+  const { repo, search, setRepo, setSearch } = useFilterStore();
+  const pageParam = searchParams.get('page');
+  const [page, setPage] = useState(pageParam ? Number(pageParam) : 1);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const toast = useToast();
-  const { data: repos } = useSWR<string[]>('/api/issues/repos', fetcher);
-  const { issues, isLoading, mutate } = useIssues({
-    repo_full_name: repoFilter,
-    search: searchQuery || undefined,
-  });
+  // Sync URL -> store on mount and when URL params change externally
+  useEffect(() => {
+    const urlRepo = searchParams.get('repo') || undefined;
+    const urlSearch = searchParams.get('q') || '';
+    if (urlRepo !== repo) setRepo(urlRepo);
+    if (urlSearch !== search) setSearch(urlSearch);
+  }, [searchParams]);
 
+  // Sync store search -> URL (debounced)
   useEffect(() => {
     debounceRef.current = setTimeout(() => {
       const params = new URLSearchParams(searchParams.toString());
-      if (searchInput) {
-        params.set('q', searchInput);
+      if (search) {
+        params.set('q', search);
       } else {
         params.delete('q');
       }
@@ -63,7 +69,40 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
       router.replace(query ? `?${query}` : '/');
     }, 300);
     return () => clearTimeout(debounceRef.current);
-  }, [searchInput]);
+  }, [search]);
+
+  const toast = useToast();
+  const { data: repos } = useSWR<string[]>('/api/issues/repos', fetcher);
+  const { labels } = useLabels();
+  const [selectedLabels, setSelectedLabels] = useState<number[]>([]);
+
+  const { issues, total, isLoading, mutate } = useIssues({
+    repo_full_name: repo,
+    search: search || undefined,
+    label_ids: selectedLabels.length > 0 ? selectedLabels : undefined,
+    page,
+    limit: ITEMS_PER_PAGE,
+  });
+
+  const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    const params = new URLSearchParams(searchParams.toString());
+    if (newPage > 1) {
+      params.set('page', String(newPage));
+    } else {
+      params.delete('page');
+    }
+    const query = params.toString();
+    router.replace(query ? `?${query}` : '/');
+  };
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, repo, selectedLabels]);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIssue, setEditingIssue] = useState<Issue | null>(null);
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
@@ -80,15 +119,21 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
     refresh: () => mutate(),
   }));
 
-  const handleRepoChange = (repo: string) => {
+  const handleRepoChange = (newRepo: string) => {
+    const repoValue = newRepo || undefined;
+    setRepo(repoValue);
     const params = new URLSearchParams(searchParams.toString());
-    if (repo) {
-      params.set('repo', repo);
+    if (newRepo) {
+      params.set('repo', newRepo);
     } else {
       params.delete('repo');
     }
     const query = params.toString();
     router.push(query ? `?${query}` : '/');
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
   };
 
   const handleCreate = async (data: IssueCreate | IssueUpdate) => {
@@ -166,7 +211,7 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
       items: issues.map((i) =>
         i.id === issueId ? { ...i, status: newStatus } : i
       ),
-      total: issues.length,
+      total,
     };
     mutate(optimisticData, false);
 
@@ -256,8 +301,8 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
             <input
               type="text"
               placeholder="검색..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-7 pr-3 py-1 text-xs text-gray-600 bg-white border border-gray-200 rounded-md w-40 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>
@@ -265,14 +310,14 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
           <div className="flex items-center gap-1.5">
             <GitBranch className="w-3.5 h-3.5 text-gray-400" />
             <select
-              value={repoFilter || ''}
+              value={repo || ''}
               onChange={(e) => handleRepoChange(e.target.value)}
               className="text-xs text-gray-600 bg-white border border-gray-200 rounded-md px-2 py-1 pr-6 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             >
               <option value="">모든 리포지토리</option>
-              {repos.map((repo) => (
-                <option key={repo} value={repo}>
-                  {repo}
+              {repos.map((r) => (
+                <option key={r} value={r}>
+                  {r}
                 </option>
               ))}
             </select>
@@ -280,6 +325,37 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
         )}
         </div>
       </div>
+
+      {/* 라벨 필터 */}
+      {labels && labels.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap mb-4">
+          {labels.map((label) => (
+            <button
+              key={label.id}
+              onClick={() => {
+                setSelectedLabels((prev) =>
+                  prev.includes(label.id)
+                    ? prev.filter((id) => id !== label.id)
+                    : [...prev, label.id]
+                );
+              }}
+              className={clsx(
+                'inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-medium border transition-colors cursor-pointer',
+                selectedLabels.includes(label.id)
+                  ? 'opacity-100'
+                  : 'opacity-40 hover:opacity-70'
+              )}
+              style={{
+                backgroundColor: selectedLabels.includes(label.id) ? `${label.color}20` : 'transparent',
+                color: label.color,
+                borderColor: `${label.color}50`,
+              }}
+            >
+              {label.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* 칸반 보드 (DnD) */}
       <DndContext
@@ -319,6 +395,9 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {/* 페이지네이션 */}
+      <Pagination currentPage={page} totalPages={totalPages} onPageChange={handlePageChange} />
 
       {/* 생성 모달 */}
       {modalOpen && (

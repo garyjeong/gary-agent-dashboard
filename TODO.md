@@ -76,7 +76,7 @@
 - [x] 백엔드: `labels` 테이블 생성 (id, name, color)
 - [x] 백엔드: `issue_labels` 다대다 관계 테이블
 - [x] 프론트엔드: 라벨 선택 UI (멀티셀렉트)
-- [ ] 프론트엔드: 라벨별 필터링
+- [x] 프론트엔드: 라벨별 필터링
 - [x] 기본 라벨: bug (빨강), feature (파랑), refactor (노랑), docs (초록)
 - **파일**: `backend/src/models/label.py`, `backend/src/routes/labels.py`, `frontend/src/hooks/useLabels.ts`
 
@@ -120,8 +120,8 @@
 
 ### 5.1 페이지네이션 UI
 - [x] 백엔드: skip/limit 페이지네이션 지원
-- [ ] 프론트엔드: 페이지 컨트롤 컴포넌트 구현
-- [ ] URL 쿼리 파라미터로 페이지 상태 유지
+- [x] 프론트엔드: 페이지 컨트롤 컴포넌트 구현
+- [x] URL 쿼리 파라미터로 페이지 상태 유지
 - **파일**: `frontend/src/components/issues/IssueBoard.tsx`
 
 ### 5.2 검색 기능
@@ -142,7 +142,7 @@
 ### 5.5 GitHub PR 연동
 - [x] 일감에 PR URL 필드 추가
 - [x] PR 생성 시 자동 연결 (에이전트 작업 결과)
-- [ ] PR 상태 표시 (open, merged, closed) — GitHub API 연동 필요
+- [x] PR 상태 표시 (open, merged, closed)
 - **파일**: `backend/src/models/issue.py`, `frontend/src/components/issues/IssueCard.tsx`
 
 ---
@@ -182,7 +182,7 @@
 
 ### 7.2 프론트엔드 상태 관리
 - [x] Zustand 도입 (스토어 생성)
-- [ ] 필터 상태 전역화 (IssueBoard에 Zustand 통합)
+- [x] 필터 상태 전역화 (IssueBoard에 Zustand 통합)
 - **파일**: `frontend/src/lib/store.ts` (신규)
 
 ### 7.3 컴포넌트 분리

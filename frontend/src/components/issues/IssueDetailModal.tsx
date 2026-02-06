@@ -97,15 +97,31 @@ export function IssueDetailModal({ issue, onClose, onEdit }: IssueDetailModalPro
               </span>
             )}
             {issue.pr_url && (
-              <a
-                href={issue.pr_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-primary-600 hover:text-primary-700"
-              >
-                <ExternalLink className="w-3 h-3" />
-                PR 링크
-              </a>
+              <div className="flex items-center gap-2">
+                <a
+                  href={issue.pr_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  PR 링크
+                </a>
+                {issue.pr_status && (
+                  <Badge
+                    variant={
+                      issue.pr_status === 'merged' ? 'success'
+                      : issue.pr_status === 'closed' ? 'danger'
+                      : 'info'
+                    }
+                    size="sm"
+                  >
+                    {issue.pr_status === 'open' ? 'Open'
+                      : issue.pr_status === 'merged' ? 'Merged'
+                      : 'Closed'}
+                  </Badge>
+                )}
+              </div>
             )}
             <span>생성: {formatRelativeTime(issue.created_at)}</span>
             <span>수정: {formatRelativeTime(issue.updated_at)}</span>

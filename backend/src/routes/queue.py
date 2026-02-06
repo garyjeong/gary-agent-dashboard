@@ -111,6 +111,7 @@ async def update_queue_item(
         )
         if pr_match and not queue_item.issue.pr_url:
             queue_item.issue.pr_url = pr_match.group()
+            queue_item.issue.pr_status = "open"
             await db.commit()
             await db.refresh(queue_item)
             logger.info(

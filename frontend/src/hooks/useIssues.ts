@@ -11,6 +11,9 @@ interface UseIssuesParams {
   priority?: IssuePriority;
   repo_full_name?: string;
   search?: string;
+  label_ids?: number[];
+  page?: number;
+  limit?: number;
 }
 
 export function useIssues(params?: UseIssuesParams) {
@@ -19,7 +22,13 @@ export function useIssues(params?: UseIssuesParams) {
   if (params?.priority) searchParams.set('priority', params.priority);
   if (params?.repo_full_name) searchParams.set('repo_full_name', params.repo_full_name);
   if (params?.search) searchParams.set('search', params.search);
-  
+  if (params?.label_ids && params.label_ids.length > 0) searchParams.set('label_ids', params.label_ids.join(','));
+  if (params?.page !== undefined && params?.limit !== undefined) {
+    const skip = (params.page - 1) * params.limit;
+    searchParams.set('skip', String(skip));
+    searchParams.set('limit', String(params.limit));
+  }
+
   const query = searchParams.toString();
   const url = query ? `/api/issues?${query}` : '/api/issues';
   
