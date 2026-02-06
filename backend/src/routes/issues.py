@@ -1,15 +1,22 @@
 """일감 라우터"""
+import asyncio
+import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import get_db
+from src.database import get_db, async_session_maker
 from src.models.issue import IssueStatus, IssuePriority
+from src.models.issue import Issue as IssueModel
 from src.models.queue_item import QueueItem
+from src.models.user import User
 from src.dependencies import get_issue_service, get_queue_service
 from src.services.issue_service import IssueService
 from src.services.queue_service import QueueService
+from src.services.gemini_service import GeminiAnalysisService
+from src.services.github_service import GitHubAPIService
+from src.crypto import decrypt_token
 from src.schemas.issue import (
     IssueCreate,
     IssueUpdate,
@@ -17,7 +24,8 @@ from src.schemas.issue import (
     IssueListResponse,
 )
 from src.schemas.queue import QueueItemResponse
-from src.models.issue import Issue as IssueModel
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/issues", tags=["issues"])
 
@@ -30,16 +38,55 @@ def _enrich_issue_response(issue) -> IssueResponse:
         response.latest_queue_status = latest.status.value
     if issue.pr_status:
         response.pr_status = issue.pr_status
+    if issue.ai_plan_status:
+        response.ai_plan_status = issue.ai_plan_status
     return response
+
+
+async def _get_github_token(db: AsyncSession) -> Optional[str]:
+    """사용자의 GitHub 리포 토큰 조회"""
+    result = await db.execute(select(User).limit(1))
+    user = result.scalar_one_or_none()
+    if user and user.github_repo_token:
+        return decrypt_token(user.github_repo_token)
+    if user and user.github_access_token:
+        return decrypt_token(user.github_access_token)
+    return None
 
 
 @router.post("", response_model=IssueResponse, status_code=201)
 async def create_issue(
     data: IssueCreate,
+    db: AsyncSession = Depends(get_db),
     service: IssueService = Depends(get_issue_service),
 ):
-    """일감 생성"""
+    """일감 생성 + AI 작업 계획 자동 생성"""
     issue = await service.create_issue(data)
+
+    # description이 있으면 AI 작업 계획 백그라운드 생성
+    if data.description and data.description.strip():
+        issue_id = issue.id
+        github_token = await _get_github_token(db)
+
+        # 응답 반환 전에 상태를 generating으로 설정
+        issue.ai_plan_status = "generating"
+        await db.commit()
+        await db.refresh(issue)
+
+        async def _generate_plan():
+            async with async_session_maker() as bg_db:
+                try:
+                    github_api = GitHubAPIService(github_token or "")
+                    gemini_service = GeminiAnalysisService(github_api)
+                    await gemini_service.generate_work_plan(issue_id, bg_db)
+                except Exception:
+                    logger.exception(
+                        "Background work plan generation failed: issue_id=%d",
+                        issue_id,
+                    )
+
+        asyncio.create_task(_generate_plan())
+
     return _enrich_issue_response(issue)
 
 
@@ -148,38 +195,29 @@ async def generate_behavior(
     db: AsyncSession = Depends(get_db),
     service: IssueService = Depends(get_issue_service),
 ):
-    """일감의 동작 예시 자동 생성"""
-    from src.services.behavior_generator import BehaviorGenerator
-    from src.services.github_service import GitHubAPIService
-    from src.auth import require_current_user
-    from src.crypto import decrypt_token
-
+    """AI 작업 계획 재생성"""
     issue = await service.get_issue(issue_id)
 
-    if not issue.repo_full_name:
-        raise HTTPException(status_code=400, detail="리포지토리가 연결되지 않은 일감입니다")
+    github_token = await _get_github_token(db)
+    issue_id_val = issue.id
 
-    # 현재 사용자의 GitHub 토큰으로 API 호출
-    # NOTE: 이 엔드포인트는 인증된 사용자의 토큰이 필요합니다
-    from sqlalchemy import select
-    from src.models.user import User
+    async def _regenerate_plan():
+        async with async_session_maker() as bg_db:
+            try:
+                github_api = GitHubAPIService(github_token or "")
+                gemini_service = GeminiAnalysisService(github_api)
+                await gemini_service.generate_work_plan(issue_id_val, bg_db)
+            except Exception:
+                logger.exception(
+                    "Background work plan regeneration failed: issue_id=%d",
+                    issue_id_val,
+                )
 
-    result = await db.execute(select(User).limit(1))
-    user = result.scalar_one_or_none()
-    if not user or not user.github_access_token:
-        raise HTTPException(status_code=401, detail="GitHub 인증이 필요합니다")
+    asyncio.create_task(_regenerate_plan())
 
-    access_token = decrypt_token(user.github_access_token)
-    github_api = GitHubAPIService(access_token)
-    generator = BehaviorGenerator(github_api)
-    behavior = await generator.generate(
-        issue.repo_full_name,
-        issue.title,
-        issue.description,
-    )
-
-    issue.behavior_example = behavior
+    # 즉시 상태 업데이트
+    issue.ai_plan_status = "generating"
     await db.commit()
     await db.refresh(issue)
 
-    return IssueResponse.model_validate(issue)
+    return _enrich_issue_response(issue)

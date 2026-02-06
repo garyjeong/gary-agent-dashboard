@@ -67,15 +67,11 @@ export default function LoginPage() {
           <ul className="space-y-1.5">
             <li className="flex items-start gap-2 text-[11px] text-gray-400">
               <span className="w-1 h-1 rounded-full bg-gray-300 mt-1.5 flex-shrink-0" />
-              <span><span className="text-gray-500">public_repo</span> — 공개 리포지토리 읽기/쓰기</span>
-            </li>
-            <li className="flex items-start gap-2 text-[11px] text-gray-400">
-              <span className="w-1 h-1 rounded-full bg-gray-300 mt-1.5 flex-shrink-0" />
               <span><span className="text-gray-500">read:user</span> — 프로필 정보 읽기 전용</span>
             </li>
           </ul>
           <p className="text-[10px] text-gray-300 mt-2">
-            비공개 리포지토리에는 접근하지 않습니다.
+            리포지토리 접근 권한은 별도로 요청됩니다.
           </p>
         </div>
       </div>

@@ -1,6 +1,6 @@
 """인증 라우터"""
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, Response, Cookie
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, Cookie, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -80,12 +80,59 @@ async def github_callback(
     return response
 
 
+@router.get("/github/authorize-repos", response_model=AuthURLResponse)
+async def github_authorize_repos(
+    redirect_uri: str = Query(
+        default="http://localhost:5556/api/auth/github/callback/repos"
+    ),
+    service: GitHubService = Depends(get_github_service),
+):
+    """GitHub 리포지토리 접근 권한 인증 URL 반환"""
+    url = service.get_authorize_url(redirect_uri, scope="public_repo read:user")
+    return AuthURLResponse(url=url)
+
+
+@router.get("/github/callback/repos")
+async def github_repos_callback(
+    code: str,
+    access_token: Optional[str] = Cookie(default=None),
+    service: GitHubService = Depends(get_github_service),
+):
+    """GitHub 리포지토리 접근 권한 콜백 — repo 토큰 저장"""
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="로그인이 필요합니다",
+        )
+    payload = verify_token(access_token, expected_type="access")
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="인증이 만료되었습니다",
+        )
+    user_id = int(payload["sub"])
+
+    repo_token = await service.exchange_code_for_token(code)
+    await service.save_repo_token(user_id, repo_token)
+
+    return RedirectResponse(url="http://localhost:5555/github", status_code=302)
+
+
 @router.get("/me", response_model=Optional[UserResponse])
 async def get_me(
     user: Optional[User] = Depends(get_current_user),
 ):
     """현재 로그인 사용자 정보"""
-    return user
+    if not user:
+        return None
+    return UserResponse(
+        id=user.id,
+        github_id=user.github_id,
+        github_login=user.github_login,
+        github_name=user.github_name,
+        github_avatar_url=user.github_avatar_url,
+        has_repo_token=bool(user.github_repo_token),
+    )
 
 
 @router.post("/refresh")

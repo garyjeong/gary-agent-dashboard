@@ -1,9 +1,10 @@
 'use client';
 
-import { X } from 'lucide-react';
 import { useState } from 'react';
+import { Loader2, ArrowUp, ArrowRight, ArrowDown } from 'lucide-react';
 import { useRepos, useAuth, useLabels } from '@/hooks';
-import { Button } from '@/components/ui';
+import { Modal } from '@/components/ui/Modal';
+import { clsx } from 'clsx';
 import type { Issue, IssueCreate, IssueUpdate, IssueStatus, IssuePriority, Label } from '@/types';
 
 interface IssueModalProps {
@@ -12,271 +13,198 @@ interface IssueModalProps {
   onSubmit: (data: IssueCreate | IssueUpdate) => Promise<void>;
 }
 
+const priorityOptions: { value: IssuePriority; label: string; icon: typeof ArrowUp; color: string }[] = [
+  { value: 'high', label: '높음', icon: ArrowUp, color: 'text-red-500' },
+  { value: 'medium', label: '보통', icon: ArrowRight, color: 'text-yellow-500' },
+  { value: 'low', label: '낮음', icon: ArrowDown, color: 'text-blue-500' },
+];
+
+const statusOptions: { value: IssueStatus; label: string }[] = [
+  { value: 'todo', label: 'To Do' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'done', label: 'Done' },
+];
+
 export function IssueModal({ issue, onClose, onSubmit }: IssueModalProps) {
   const isEdit = !!issue;
   const { isLoggedIn } = useAuth();
   const { repos } = useRepos();
   const { labels: availableLabels } = useLabels();
 
-  const [formData, setFormData] = useState({
-    title: issue?.title ?? '',
-    description: issue?.description ?? '',
-    status: issue?.status ?? 'todo' as IssueStatus,
-    priority: issue?.priority ?? 'medium' as IssuePriority,
-    repo_full_name: issue?.repo_full_name ?? '',
-    behavior_example: issue?.behavior_example ?? '',
-    label_ids: issue?.labels?.map((l: Label) => l.id) ?? [] as number[],
-    assignee: issue?.assignee ?? undefined as string | undefined,
-    due_date: issue?.due_date ?? undefined as string | undefined,
-  });
-
+  const [title, setTitle] = useState(issue?.title ?? '');
+  const [description, setDescription] = useState(issue?.description ?? '');
+  const [issueStatus, setIssueStatus] = useState<IssueStatus>(issue?.status ?? 'todo');
+  const [priority, setPriority] = useState<IssuePriority>(issue?.priority ?? 'medium');
+  const [repoFullName, setRepoFullName] = useState(issue?.repo_full_name ?? '');
+  const [labelIds, setLabelIds] = useState<number[]>(issue?.labels?.map((l: Label) => l.id) ?? []);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
+    if (!title.trim()) return;
     setLoading(true);
-
     try {
       await onSubmit({
-        ...formData,
-        description: formData.description || undefined,
-        repo_full_name: formData.repo_full_name || undefined,
-        behavior_example: formData.behavior_example || undefined,
-        assignee: formData.assignee || undefined,
-        due_date: formData.due_date || undefined,
-        label_ids: formData.label_ids,
+        title: title.trim(),
+        description: description.trim() || undefined,
+        status: issueStatus,
+        priority,
+        repo_full_name: repoFullName || undefined,
+        label_ids: labelIds,
       });
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* 배경 */}
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && e.metaKey && title.trim()) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
 
-      {/* 모달 */}
-      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h3 className="text-base font-semibold text-gray-900">
-            {isEdit ? '일감 수정' : '새 일감'}
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
-          >
-            <X className="w-5 h-5" />
-          </button>
+  return (
+    <Modal open onClose={onClose} title={isEdit ? '일감 수정' : '새 일감'} size="md">
+      <div className="space-y-4" onKeyDown={handleKeyDown}>
+        {/* 제목 */}
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          autoFocus
+          className="w-full text-base font-medium text-gray-900 placeholder-gray-400 border-0 border-b border-gray-200 px-0 py-2 focus:outline-none focus:border-primary-500 focus:ring-0 transition-colors"
+          placeholder="일감 제목"
+        />
+
+        {/* 설명 */}
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          className="w-full text-sm text-gray-700 placeholder-gray-400 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 resize-none transition-colors"
+          placeholder="설명 (선택)"
+        />
+
+        {/* 속성 행: 상태(수정 시만) + 우선순위 + 리포지토리 */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* 상태 (수정 시에만) */}
+          {isEdit && (
+            <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden">
+              {statusOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setIssueStatus(opt.value)}
+                  className={clsx(
+                    'px-2.5 py-1.5 text-xs font-medium transition-colors',
+                    issueStatus === opt.value
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* 우선순위 */}
+          <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden">
+            {priorityOptions.map((opt) => {
+              const Icon = opt.icon;
+              const isActive = priority === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setPriority(opt.value)}
+                  className={clsx(
+                    'flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors',
+                    isActive
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50',
+                  )}
+                >
+                  <Icon className={clsx('w-3.5 h-3.5', isActive && opt.color)} />
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 리포지토리 */}
+          {isLoggedIn && repos.length > 0 && (
+            <select
+              value={repoFullName}
+              onChange={(e) => setRepoFullName(e.target.value)}
+              className="text-xs text-gray-600 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 bg-white"
+            >
+              <option value="">리포지토리</option>
+              {repos.map((repo) => (
+                <option key={repo.id} value={repo.full_name}>
+                  {repo.full_name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
-        {/* 폼 */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-auto">
-          {/* 기본 정보 */}
-          <div className="px-5 py-4 space-y-4">
-            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              기본 정보
-            </div>
-
-            {/* 제목 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                제목 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                required
-                className="input"
-                placeholder="일감 제목을 입력하세요"
-              />
-            </div>
-
-            {/* 설명 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                설명
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-                className="input resize-none"
-                placeholder="일감에 대한 상세 설명"
-              />
-            </div>
-
-            {/* 상태 & 우선순위 */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  상태
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as IssueStatus })}
-                  className="input"
-                >
-                  <option value="todo">To Do</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="done">Done</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  우선순위
-                </label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value as IssuePriority })}
-                  className="input"
-                >
-                  <option value="low">낮음</option>
-                  <option value="medium">보통</option>
-                  <option value="high">높음</option>
-                </select>
-              </div>
-            </div>
-
-            {/* 담당자 & 마감일 */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">담당자</label>
-                <input
-                  type="text"
-                  value={formData.assignee || ''}
-                  onChange={(e) => setFormData({ ...formData, assignee: e.target.value || undefined })}
-                  className="input"
-                  placeholder="담당자 이름 (선택)"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">마감일</label>
-                <input
-                  type="date"
-                  value={formData.due_date ? formData.due_date.split('T')[0] : ''}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value ? `${e.target.value}T00:00:00` : undefined })}
-                  className="input"
-                />
-              </div>
-            </div>
-
-            {/* 라벨 */}
-            {availableLabels.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  라벨
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {availableLabels.map((label) => {
-                    const selected = formData.label_ids.includes(label.id);
-                    return (
-                      <button
-                        key={label.id}
-                        type="button"
-                        onClick={() => {
-                          setFormData({
-                            ...formData,
-                            label_ids: selected
-                              ? formData.label_ids.filter((id) => id !== label.id)
-                              : [...formData.label_ids, label.id],
-                          });
-                        }}
-                        className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-all border"
-                        style={{
-                          backgroundColor: selected ? `${label.color}20` : 'transparent',
-                          color: selected ? label.color : '#6B7280',
-                          borderColor: selected ? label.color : '#E5E7EB',
-                        }}
-                      >
-                        {label.name}
-                      </button>
+        {/* 라벨 */}
+        {availableLabels.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {availableLabels.map((label) => {
+              const selected = labelIds.includes(label.id);
+              return (
+                <button
+                  key={label.id}
+                  type="button"
+                  onClick={() => {
+                    setLabelIds((prev) =>
+                      selected ? prev.filter((id) => id !== label.id) : [...prev, label.id],
                     );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* GitHub 연동 */}
-          <div className="px-5 py-4 space-y-4 border-t border-gray-100">
-            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              GitHub 연동
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                리포지토리
-              </label>
-              {isLoggedIn && repos.length > 0 ? (
-                <select
-                  value={formData.repo_full_name}
-                  onChange={(e) => setFormData({ ...formData, repo_full_name: e.target.value })}
-                  className="input"
+                  }}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-medium transition-all border"
+                  style={{
+                    backgroundColor: selected ? `${label.color}20` : 'transparent',
+                    color: selected ? label.color : '#9CA3AF',
+                    borderColor: selected ? `${label.color}40` : '#E5E7EB',
+                  }}
                 >
-                  <option value="">선택하세요</option>
-                  {repos.map((repo) => (
-                    <option key={repo.id} value={repo.full_name}>
-                      {repo.full_name} {repo.private ? '(Private)' : ''}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={formData.repo_full_name}
-                  onChange={(e) => setFormData({ ...formData, repo_full_name: e.target.value })}
-                  className="input"
-                  placeholder="owner/repo-name"
-                />
-              )}
-              {!isLoggedIn && (
-                <p className="mt-1.5 text-xs text-gray-400">
-                  GitHub 로그인 시 리포지토리 목록에서 선택할 수 있습니다.
-                </p>
-              )}
-            </div>
+                  {label.name}
+                </button>
+              );
+            })}
           </div>
+        )}
 
-          {/* 작업 지침 */}
-          <div className="px-5 py-4 space-y-4 border-t border-gray-100">
-            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              작업 지침
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                동작 예시
-              </label>
-              <textarea
-                value={formData.behavior_example}
-                onChange={(e) => setFormData({ ...formData, behavior_example: e.target.value })}
-                rows={5}
-                className="input resize-none font-mono text-xs"
-                placeholder="에이전트가 수행할 작업 순서를 작성하세요"
-              />
-            </div>
+        {/* 하단 */}
+        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+          <span className="text-2xs text-gray-400">⌘ Enter로 {isEdit ? '저장' : '생성'}</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={loading || !title.trim()}
+              className={clsx(
+                'inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-md transition-colors',
+                title.trim() && !loading
+                  ? 'bg-primary-600 text-white hover:bg-primary-700'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed',
+              )}
+            >
+              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {isEdit ? '저장' : '생성'}
+            </button>
           </div>
-        </form>
-
-        {/* 푸터 */}
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            취소
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={loading || !formData.title}
-            onClick={handleSubmit}
-          >
-            {loading ? '저장 중...' : isEdit ? '수정' : '생성'}
-          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

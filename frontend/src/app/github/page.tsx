@@ -9,14 +9,18 @@ import { fetcher } from '@/lib/fetcher';
 import { useAuth } from '@/hooks';
 import {
   GitBranch, ExternalLink, Star, Lock,
-  X, Download, CircleDot, Loader2, Settings, Link2, Check,
+  Loader2, Settings, Link2, Check,
   Clock, AlertTriangle, RefreshCw, FileText, CheckCircle2,
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Modal } from '@/components/ui/Modal';
 import { formatRelativeTime } from '@/lib/timeUtils';
 import { clsx } from 'clsx';
-import type { ConnectedRepo, ConnectedRepoListResponse, RepoAnalysis } from '@/types';
+import ReactMarkdown from 'react-markdown';
+import type {
+  ConnectedRepo, ConnectedRepoListResponse, RepoAnalysis,
+  DeepAnalysisResponse,
+} from '@/types';
 
 /* ── 타입 ─────────────────────────────────────────── */
 
@@ -35,23 +39,6 @@ interface GithubRepo {
 
 interface RepoListResponse {
   items: GithubRepo[];
-}
-
-interface GitHubIssueLabel {
-  name: string;
-  color: string;
-}
-
-interface GitHubIssue {
-  number: number;
-  title: string;
-  state: string;
-  html_url: string;
-  user: { login: string; avatar_url: string };
-  labels: GitHubIssueLabel[];
-  body: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
 /* ── 언어 색상 ──────────────────────────────────────── */
@@ -131,61 +118,240 @@ function AnalysisStatusBadge({
   }
 }
 
+/* ── 심층 분석 배지 ──────────────────────────────────── */
+
+function DeepAnalysisStatusBadge({
+  status,
+  analysisStatus,
+  repoId,
+  onTrigger,
+  onViewResult,
+}: {
+  status: ConnectedRepo['deep_analysis_status'];
+  analysisStatus: ConnectedRepo['analysis_status'];
+  repoId: number;
+  onTrigger: (repoId: number) => void;
+  onViewResult: (repoId: number) => void;
+}) {
+  // Phase 1 완료 + Phase 2 미시작 → 시작 버튼 표시
+  if (!status && analysisStatus === 'completed') {
+    return (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onTrigger(repoId);
+        }}
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors"
+      >
+        <FileText className="w-3 h-3" />
+        심층 분석 시작
+      </button>
+    );
+  }
+
+  if (!status) return null;
+
+  switch (status) {
+    case 'pending':
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-purple-50 text-purple-500">
+          <Clock className="w-3 h-3" />
+          심층 분석 대기
+        </span>
+      );
+    case 'analyzing':
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-purple-50 text-purple-600">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          심층 분석 중...
+        </span>
+      );
+    case 'completed':
+      return (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewResult(repoId);
+          }}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors"
+        >
+          <FileText className="w-3 h-3" />
+          심층 분석 완료
+        </button>
+      );
+    case 'failed':
+      return (
+        <div className="inline-flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-red-50 text-red-600">
+            <AlertTriangle className="w-3 h-3" />
+            심층 분석 실패
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onTrigger(repoId);
+            }}
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs text-gray-500 hover:text-purple-600 hover:bg-gray-100 transition-colors"
+          >
+            <RefreshCw className="w-3 h-3" />
+            재시도
+          </button>
+        </div>
+      );
+    default:
+      return null;
+  }
+}
+
 /* ── 분석 결과 모달 ────────────────────────────────── */
+
+type ModalTab = 'overview' | 'deep';
 
 function AnalysisModal({
   repoId,
   repoName,
   open,
   onClose,
+  initialTab,
 }: {
   repoId: number | null;
   repoName: string;
   open: boolean;
   onClose: () => void;
+  initialTab?: ModalTab;
 }) {
-  const { data, isLoading, error } = useSWR<RepoAnalysis>(
+  const [activeTab, setActiveTab] = useState<ModalTab>(initialTab ?? 'overview');
+
+  // Phase 1 데이터
+  const { data: phase1, isLoading: p1Loading, error: p1Error } = useSWR<RepoAnalysis>(
     repoId && open ? `/api/github/connected-repos/${repoId}/analysis` : null,
     fetcher,
   );
 
+  // Phase 2 데이터
+  const { data: phase2, isLoading: p2Loading, error: p2Error } = useSWR<DeepAnalysisResponse>(
+    repoId && open ? `/api/github/connected-repos/${repoId}/deep-analysis` : null,
+    fetcher,
+  );
+
+  // 탭 변경 시 초기화
+  useEffect(() => {
+    if (open) {
+      setActiveTab(initialTab ?? 'overview');
+    }
+  }, [open, initialTab]);
+
+  const modalTabs: { key: ModalTab; label: string }[] = [
+    { key: 'overview', label: '프로젝트 개요' },
+    { key: 'deep', label: '심층 분석' },
+  ];
+
   return (
-    <Modal open={open} onClose={onClose} title={`${repoName} 프로젝트 분석`} size="lg">
-      <div className="max-h-[70vh] overflow-y-auto">
-        {isLoading && (
-          <div className="flex items-center justify-center py-12 text-gray-400">
-            <Loader2 className="w-5 h-5 animate-spin mr-2" />
-            <span className="text-sm">분석 결과를 불러오는 중...</span>
-          </div>
-        )}
-        {error && !isLoading && (
-          <div className="py-8 text-center">
-            <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-            <p className="text-sm text-red-500">분석 결과를 불러올 수 없습니다.</p>
-          </div>
-        )}
-        {data && !isLoading && (
-          <div>
-            {data.analysis_result ? (
-              <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap leading-relaxed">
-                {data.analysis_result}
+    <Modal open={open} onClose={onClose} title={`${repoName} 분석 결과`} size="lg">
+      {/* 탭 네비게이션 */}
+      <div className="flex items-center gap-1 border-b border-gray-200 mb-4 -mt-2">
+        {modalTabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={clsx(
+              'px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px',
+              activeTab === tab.key
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-gray-400 hover:text-gray-600',
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="max-h-[65vh] overflow-y-auto">
+        {/* 탭 1: 프로젝트 개요 (Phase 1) */}
+        {activeTab === 'overview' && (
+          <>
+            {p1Loading && (
+              <div className="flex items-center justify-center py-12 text-gray-400">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                <span className="text-sm">분석 결과를 불러오는 중...</span>
               </div>
-            ) : data.analysis_error ? (
-              <div className="py-6 text-center">
+            )}
+            {p1Error && !p1Loading && (
+              <div className="py-8 text-center">
                 <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                <p className="text-sm text-red-500 mb-1">분석 중 오류가 발생했습니다</p>
-                <p className="text-xs text-gray-400">{data.analysis_error}</p>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 py-6 text-center">분석 결과가 없습니다.</p>
-            )}
-            {data.analyzed_at && (
-              <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-400 text-right">
-                분석 완료: {new Date(data.analyzed_at).toLocaleString('ko-KR')}
+                <p className="text-sm text-red-500">분석 결과를 불러올 수 없습니다.</p>
               </div>
             )}
-          </div>
+            {phase1 && !p1Loading && (
+              <div>
+                {phase1.analysis_result ? (
+                  <div className="prose prose-sm max-w-none text-gray-700">
+                    <ReactMarkdown>{phase1.analysis_result}</ReactMarkdown>
+                  </div>
+                ) : phase1.analysis_error ? (
+                  <div className="py-6 text-center">
+                    <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                    <p className="text-sm text-red-500 mb-1">분석 중 오류가 발생했습니다</p>
+                    <p className="text-xs text-gray-400">{phase1.analysis_error}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 py-6 text-center">분석 결과가 없습니다.</p>
+                )}
+                {phase1.analyzed_at && (
+                  <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-400 text-right">
+                    분석 완료: {new Date(phase1.analyzed_at).toLocaleString('ko-KR')}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
+
+        {/* 탭 2: 심층 분석 (Phase 2 마크다운) */}
+        {activeTab === 'deep' && (
+          <>
+            {p2Loading && (
+              <div className="flex items-center justify-center py-12 text-gray-400">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                <span className="text-sm">심층 분석 결과를 불러오는 중...</span>
+              </div>
+            )}
+            {p2Error && !p2Loading && (
+              <div className="py-8 text-center">
+                <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                <p className="text-sm text-red-500">심층 분석 결과를 불러올 수 없습니다.</p>
+              </div>
+            )}
+            {phase2 && !p2Loading && (
+              <div>
+                {phase2.deep_analysis_result ? (
+                  <div className="prose prose-sm max-w-none text-gray-700">
+                    <ReactMarkdown>{phase2.deep_analysis_result}</ReactMarkdown>
+                  </div>
+                ) : phase2.deep_analysis_status === 'analyzing' ? (
+                  <div className="flex items-center justify-center py-12 text-gray-400">
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    <span className="text-sm">심층 분석이 진행 중입니다...</span>
+                  </div>
+                ) : phase2.deep_analysis_error ? (
+                  <div className="py-6 text-center">
+                    <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                    <p className="text-sm text-red-500 mb-1">심층 분석 중 오류가 발생했습니다</p>
+                    <p className="text-xs text-gray-400">{phase2.deep_analysis_error}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 py-6 text-center">심층 분석 결과가 없습니다.</p>
+                )}
+                {phase2.deep_analyzed_at && (
+                  <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-400 text-right">
+                    심층 분석 완료: {new Date(phase2.deep_analyzed_at).toLocaleString('ko-KR')}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
       </div>
     </Modal>
   );
@@ -350,13 +516,14 @@ function ConnectedReposTab({
   connectedRepos,
   isLoading,
   onRetryAnalysis,
+  onTriggerDeepAnalysis,
 }: {
   connectedRepos: ConnectedRepo[] | undefined;
   isLoading: boolean;
   onRetryAnalysis: (repoId: number) => void;
+  onTriggerDeepAnalysis: (repoId: number) => void;
 }) {
-  const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
-  const [analysisModal, setAnalysisModal] = useState<{ repoId: number; name: string } | null>(null);
+  const [analysisModal, setAnalysisModal] = useState<{ repoId: number; name: string; tab?: ModalTab } | null>(null);
 
   if (isLoading) {
     return (
@@ -397,17 +564,21 @@ function ConnectedReposTab({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {connectedRepos.map((repo) => {
           const langColor = repo.language ? languageColors[repo.language] : '#8b949e';
-          const isSelected = selectedRepo === repo.full_name;
 
           return (
             <Card
               key={repo.id}
               hover
-              className={clsx(
-                'p-5 transition-all',
-                isSelected && 'ring-2 ring-primary-500 border-primary-500',
-              )}
-              onClick={() => setSelectedRepo(isSelected ? null : repo.full_name)}
+              className="p-5 transition-all"
+              onClick={() => {
+                if (repo.analysis_status === 'completed') {
+                  setAnalysisModal({
+                    repoId: repo.id,
+                    name: repo.name,
+                    tab: repo.deep_analysis_status === 'completed' ? 'deep' : 'overview',
+                  });
+                }
+              }}
             >
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -432,12 +603,19 @@ function ConnectedReposTab({
                 </a>
               </div>
               {/* 분석 상태 배지 */}
-              <div className="mb-3">
+              <div className="flex flex-wrap items-center gap-1.5 mb-3">
                 <AnalysisStatusBadge
                   status={repo.analysis_status}
                   repoId={repo.id}
                   onRetry={onRetryAnalysis}
-                  onViewResult={(id) => setAnalysisModal({ repoId: id, name: repo.name })}
+                  onViewResult={(id) => setAnalysisModal({ repoId: id, name: repo.name, tab: 'overview' })}
+                />
+                <DeepAnalysisStatusBadge
+                  status={repo.deep_analysis_status}
+                  analysisStatus={repo.analysis_status}
+                  repoId={repo.id}
+                  onTrigger={onTriggerDeepAnalysis}
+                  onViewResult={(id) => setAnalysisModal({ repoId: id, name: repo.name, tab: 'deep' })}
                 />
               </div>
               <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed min-h-[2.5rem]">
@@ -466,162 +644,15 @@ function ConnectedReposTab({
         })}
       </div>
 
-      {/* 이슈 목록 패널 */}
-      {selectedRepo && (
-        <IssueListPanel
-          repoFullName={selectedRepo}
-          onClose={() => setSelectedRepo(null)}
-        />
-      )}
-
       {/* 분석 결과 모달 */}
       <AnalysisModal
         repoId={analysisModal?.repoId ?? null}
         repoName={analysisModal?.name ?? ''}
         open={!!analysisModal}
         onClose={() => setAnalysisModal(null)}
+        initialTab={analysisModal?.tab}
       />
     </div>
-  );
-}
-
-/* ── 이슈 목록 패널 ─────────────────────────────────── */
-
-function IssueListPanel({
-  repoFullName,
-  onClose,
-}: {
-  repoFullName: string;
-  onClose: () => void;
-}) {
-  const [importingIssue, setImportingIssue] = useState<number | null>(null);
-  const [importedIssues, setImportedIssues] = useState<Set<number>>(new Set());
-
-  const [owner, repo] = repoFullName.split('/');
-  const { data: issues, isLoading, error } = useSWR<GitHubIssue[]>(
-    `/api/github/repos/${owner}/${repo}/issues`,
-    fetcher,
-    { revalidateOnFocus: false },
-  );
-
-  const importIssue = async (issueNumber: number) => {
-    setImportingIssue(issueNumber);
-    try {
-      const res = await fetch(
-        `/api/github/repos/${owner}/${repo}/issues/${issueNumber}/import`,
-        { method: 'POST' },
-      );
-      if (res.ok) {
-        setImportedIssues((prev) => new Set(prev).add(issueNumber));
-      } else {
-        const data = await res.json().catch(() => ({ detail: '가져오기 실패' }));
-        alert(data.detail || '가져오기 실패');
-      }
-    } catch {
-      alert('네트워크 오류가 발생했습니다');
-    } finally {
-      setImportingIssue(null);
-    }
-  };
-
-  return (
-    <Card className="mt-6">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <CircleDot className="w-4 h-4 text-green-600" />
-          <h3 className="text-sm font-semibold text-gray-800">{repoFullName} 이슈</h3>
-          {issues && <span className="text-xs text-gray-400">({issues.length}건)</span>}
-        </div>
-        <button
-          onClick={onClose}
-          className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      {isLoading && (
-        <div className="flex items-center justify-center py-8 text-gray-400">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" />
-          <span className="text-sm">이슈를 불러오는 중...</span>
-        </div>
-      )}
-
-      {error && !isLoading && (
-        <div className="px-5 py-6 text-center">
-          <p className="text-sm text-red-500">이슈를 불러올 수 없습니다.</p>
-        </div>
-      )}
-
-      {!isLoading && !error && issues && issues.length === 0 && (
-        <div className="px-5 py-8 text-center">
-          <p className="text-sm text-gray-500">열린 이슈가 없습니다.</p>
-        </div>
-      )}
-
-      {!isLoading && issues && issues.length > 0 && (
-        <div className="divide-y divide-gray-100">
-          {issues.map((issue) => (
-            <div
-              key={issue.number}
-              className="flex items-center justify-between py-2.5 px-5 hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <CircleDot
-                  className={clsx(
-                    'w-3.5 h-3.5 flex-shrink-0',
-                    issue.state === 'open' ? 'text-green-600' : 'text-purple-600',
-                  )}
-                />
-                <span className="text-xs text-gray-400 flex-shrink-0">#{issue.number}</span>
-                <a
-                  href={issue.html_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-gray-800 hover:text-primary-600 truncate"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {issue.title}
-                </a>
-                {issue.labels.map((l) => (
-                  <span
-                    key={l.name}
-                    className="text-2xs px-1.5 py-0.5 rounded flex-shrink-0"
-                    style={{ backgroundColor: `#${l.color}20`, color: `#${l.color}` }}
-                  >
-                    {l.name}
-                  </span>
-                ))}
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                <span className="text-2xs text-gray-400">{formatRelativeTime(issue.updated_at)}</span>
-                {importedIssues.has(issue.number) ? (
-                  <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded">가져옴</span>
-                ) : (
-                  <button
-                    onClick={() => importIssue(issue.number)}
-                    disabled={importingIssue === issue.number}
-                    className={clsx(
-                      'inline-flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors',
-                      importingIssue === issue.number
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-primary-600 text-white hover:bg-primary-700',
-                    )}
-                  >
-                    {importingIssue === issue.number ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Download className="w-3 h-3" />
-                    )}
-                    가져오기
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
   );
 }
 
@@ -629,7 +660,7 @@ function IssueListPanel({
 
 export default function GitHubPage() {
   const router = useRouter();
-  const { isLoggedIn, isLoading: authLoading } = useAuth();
+  const { isLoggedIn, isLoading: authLoading, hasRepoToken, authorizeRepos } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('connected');
   const [togglingId, setTogglingId] = useState<number | null>(null);
@@ -641,7 +672,7 @@ export default function GitHubPage() {
     error: reposError,
     mutate: mutateRepos,
   } = useSWR<RepoListResponse>(
-    isLoggedIn ? '/api/github/repos' : null,
+    isLoggedIn && hasRepoToken ? '/api/github/repos' : null,
     fetcher,
     { revalidateOnFocus: false },
   );
@@ -652,7 +683,7 @@ export default function GitHubPage() {
     isLoading: connectedLoading,
     mutate: mutateConnected,
   } = useSWR<ConnectedRepoListResponse>(
-    isLoggedIn ? '/api/github/connected-repos' : null,
+    isLoggedIn && hasRepoToken ? '/api/github/connected-repos' : null,
     fetcher,
     { revalidateOnFocus: false },
   );
@@ -661,9 +692,16 @@ export default function GitHubPage() {
   const connectedRepos = connectedData?.items;
   const connectedIds = new Set(connectedRepos?.map((r) => r.github_repo_id) ?? []);
 
-  // 분석 진행 중인 리포가 있으면 3초마다 폴링
+  // 분석 진행 중인 리포가 있으면 3초마다 폴링 (Phase 1 + Phase 2)
   const hasAnalyzing = useMemo(
-    () => connectedRepos?.some((r) => r.analysis_status === 'pending' || r.analysis_status === 'analyzing') ?? false,
+    () =>
+      connectedRepos?.some(
+        (r) =>
+          r.analysis_status === 'pending' ||
+          r.analysis_status === 'analyzing' ||
+          r.deep_analysis_status === 'pending' ||
+          r.deep_analysis_status === 'analyzing',
+      ) ?? false,
     [connectedRepos],
   );
 
@@ -688,6 +726,25 @@ export default function GitHubPage() {
         if (!res.ok) {
           const data = await res.json().catch(() => ({ detail: '재시도 실패' }));
           alert(data.detail || '재시도 실패');
+          return;
+        }
+        await mutateConnected();
+      } catch {
+        alert('네트워크 오류가 발생했습니다');
+      }
+    },
+    [mutateConnected],
+  );
+
+  const handleTriggerDeepAnalysis = useCallback(
+    async (repoId: number) => {
+      try {
+        const res = await fetch(`/api/github/connected-repos/${repoId}/deep-analysis/trigger`, {
+          method: 'POST',
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({ detail: '심층 분석 트리거 실패' }));
+          alert(data.detail || '심층 분석 트리거 실패');
           return;
         }
         await mutateConnected();
@@ -736,6 +793,57 @@ export default function GitHubPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-primary-600" />
+      </div>
+    );
+  }
+
+  if (isLoggedIn && !hasRepoToken) {
+    return (
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header title="GitHub 연동" onMenuClick={() => setSidebarOpen(true)} />
+          <main className="flex-1 overflow-auto p-4 lg:p-6">
+            <div className="max-w-lg mx-auto mt-20">
+              <Card className="p-8 text-center">
+                <div className="text-gray-400 mb-4">
+                  <Lock className="w-12 h-12 mx-auto" />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                  리포지토리 접근 권한 필요
+                </h2>
+                <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+                  GitHub 리포지토리에 접근하려면 추가 권한이 필요합니다.<br />
+                  아래 버튼을 클릭하여 권한을 부여해주세요.
+                </p>
+                <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 mb-6 text-left">
+                  <p className="text-[11px] font-medium text-gray-500 mb-2">요청되는 추가 권한</p>
+                  <ul className="space-y-1.5">
+                    <li className="flex items-start gap-2 text-[11px] text-gray-400">
+                      <span className="w-1 h-1 rounded-full bg-gray-300 mt-1.5 flex-shrink-0" />
+                      <span>
+                        <span className="text-gray-500">public_repo</span> — 공개 리포지토리 읽기/쓰기
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2 text-[11px] text-gray-400">
+                      <span className="w-1 h-1 rounded-full bg-gray-300 mt-1.5 flex-shrink-0" />
+                      <span>
+                        <span className="text-gray-500">read:user</span> — 프로필 정보 읽기 전용
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+                <button
+                  onClick={authorizeRepos}
+                  className="w-full h-10 flex items-center justify-center gap-2 rounded-md text-sm font-medium text-white bg-[#24292f] hover:brightness-110 transition-all"
+                >
+                  <GitBranch className="w-4 h-4" />
+                  GitHub 리포지토리 권한 부여
+                </button>
+              </Card>
+            </div>
+          </main>
+        </div>
       </div>
     );
   }
@@ -817,6 +925,7 @@ export default function GitHubPage() {
                 connectedRepos={connectedRepos}
                 isLoading={connectedLoading}
                 onRetryAnalysis={handleRetryAnalysis}
+                onTriggerDeepAnalysis={handleTriggerDeepAnalysis}
               />
             )}
           </div>

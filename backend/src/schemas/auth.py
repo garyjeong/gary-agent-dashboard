@@ -15,6 +15,7 @@ class UserResponse(BaseModel):
     github_login: str
     github_name: Optional[str]
     github_avatar_url: Optional[str]
+    has_repo_token: bool = False
 
     class Config:
         from_attributes = True

@@ -42,6 +42,7 @@ export interface ConnectedRepo {
   stargazers_count: number;
   connected_at: string;
   analysis_status: 'pending' | 'analyzing' | 'completed' | 'failed' | null;
+  deep_analysis_status: 'pending' | 'analyzing' | 'completed' | 'failed' | null;
 }
 
 export interface ConnectedRepoListResponse {
@@ -53,4 +54,34 @@ export interface RepoAnalysis {
   analysis_result: string | null;
   analysis_error: string | null;
   analyzed_at: string | null;
+}
+
+export type SuggestionCategory =
+  | 'code_quality'
+  | 'security'
+  | 'performance'
+  | 'architecture'
+  | 'testing'
+  | 'documentation';
+
+export type SuggestionSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+export interface DeepAnalysisSuggestion {
+  id: number;
+  category: SuggestionCategory;
+  severity: SuggestionSeverity;
+  title: string;
+  description: string;
+  affected_files: string | null;
+  suggested_fix: string | null;
+  issue_id: number | null;
+  created_at: string;
+}
+
+export interface DeepAnalysisResponse {
+  deep_analysis_status: string | null;
+  deep_analysis_result: string | null;
+  deep_analysis_error: string | null;
+  deep_analyzed_at: string | null;
+  suggestions: DeepAnalysisSuggestion[];
 }

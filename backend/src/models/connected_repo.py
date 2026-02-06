@@ -1,11 +1,14 @@
 """연동된 리포지토리 모델"""
 from __future__ import annotations
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Integer, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
+
+if TYPE_CHECKING:
+    from src.models.deep_analysis_suggestion import DeepAnalysisSuggestion
 
 
 class ConnectedRepo(Base):
@@ -39,3 +42,19 @@ class ConnectedRepo(Base):
     analysis_result: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     analysis_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     analyzed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # 심층 분석 (Phase 2)
+    deep_analysis_status: Mapped[Optional[str]] = mapped_column(
+        String(20), default=None, nullable=True
+    )
+    deep_analysis_result: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    deep_analysis_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    deep_analyzed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # 관계
+    deep_analysis_suggestions: Mapped[List["DeepAnalysisSuggestion"]] = relationship(
+        "DeepAnalysisSuggestion",
+        back_populates="connected_repo",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )

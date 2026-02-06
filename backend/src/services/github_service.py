@@ -25,15 +25,31 @@ class GitHubService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    def get_authorize_url(self, redirect_uri: str) -> str:
+    def get_authorize_url(self, redirect_uri: str, scope: str = "read:user") -> str:
         """GitHub OAuth 인증 URL 생성"""
         params = {
             "client_id": settings.github_client_id,
             "redirect_uri": redirect_uri,
-            "scope": "public_repo read:user",
+            "scope": scope,
         }
         query = "&".join(f"{k}={v}" for k, v in params.items())
         return f"{GITHUB_AUTHORIZE_URL}?{query}"
+
+    async def save_repo_token(self, user_id: int, access_token: str) -> User:
+        """사용자의 github_repo_token 업데이트"""
+        result = await self.db.execute(
+            select(User).where(User.id == user_id)
+        )
+        user = result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="사용자를 찾을 수 없습니다",
+            )
+        user.github_repo_token = encrypt_token(access_token)
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
 
     async def exchange_code_for_token(self, code: str) -> str:
         """인증 코드를 액세스 토큰으로 교환"""

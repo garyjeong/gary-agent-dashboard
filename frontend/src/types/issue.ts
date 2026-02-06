@@ -21,6 +21,7 @@ export interface Issue {
   pr_url: string | null;
   pr_status: string | null;
   behavior_example: string | null;
+  ai_plan_status: string | null;
   assignee: string | null;
   due_date: string | null;
   labels: Label[];

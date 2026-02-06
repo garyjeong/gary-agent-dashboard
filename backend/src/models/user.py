@@ -18,6 +18,7 @@ class User(Base):
     github_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     github_avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     github_access_token: Mapped[str] = mapped_column(Text, nullable=False)
+    github_repo_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,

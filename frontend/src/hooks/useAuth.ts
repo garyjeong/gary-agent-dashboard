@@ -27,13 +27,21 @@ export function useAuth() {
     await fetch('/api/auth/logout', { method: 'POST' });
     mutate(null);
   };
-  
+
+  const authorizeRepos = async () => {
+    const res = await fetch('/api/auth/github/authorize-repos');
+    const data = await res.json();
+    window.location.href = data.url;
+  };
+
   return {
     user: data,
     isLoading,
     isLoggedIn: !!data,
+    hasRepoToken: data?.has_repo_token ?? false,
     login,
     logout,
+    authorizeRepos,
     mutate,
   };
 }

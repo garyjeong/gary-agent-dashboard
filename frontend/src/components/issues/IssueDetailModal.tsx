@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
-import { X, GitBranch, ExternalLink, Clock, CheckCircle, XCircle, Loader2, AlertCircle, User, Calendar } from 'lucide-react';
+import { X, GitBranch, ExternalLink, Clock, CheckCircle, XCircle, Loader2, AlertCircle, User, Calendar, Sparkles, RefreshCw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { clsx } from 'clsx';
@@ -10,7 +10,7 @@ import { Badge, Button, useToast } from '@/components/ui';
 import { issueService } from '@/services/issueService';
 import { fetcher, fetcherWithOptions } from '@/lib/fetcher';
 import { formatRelativeTime } from '@/lib/timeUtils';
-import type { Issue, QueueItem, Comment } from '@/types';
+import type { Issue, QueueItem } from '@/types';
 
 interface IssueDetailModalProps {
   issue: Issue;
@@ -28,48 +28,84 @@ const queueStatusConfig: Record<string, { icon: typeof CheckCircle; color: strin
   failed: { icon: XCircle, color: 'text-red-500', label: '실패' },
 };
 
-export function IssueDetailModal({ issue, onClose, onEdit }: IssueDetailModalProps) {
+export function IssueDetailModal({ issue: initialIssue, onClose, onEdit }: IssueDetailModalProps) {
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [editingBehavior, setEditingBehavior] = useState(false);
-  const [behaviorDraft, setBehaviorDraft] = useState(issue.behavior_example || '');
-  const [newComment, setNewComment] = useState('');
-  const [submittingComment, setSubmittingComment] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const toast = useToast();
 
-  // 댓글 조회
+  // AI 계획 생성 중이면 폴링
+  const [pollingActive, setPollingActive] = useState(
+    initialIssue.ai_plan_status === 'generating',
+  );
   const {
-    data: comments,
-    isLoading: loadingComments,
-    mutate: mutateComments,
-  } = useSWR<Comment[]>(`/api/issues/${issue.id}/comments`, fetcher);
+    data: issueData,
+    mutate: mutateIssue,
+  } = useSWR<Issue>(
+    `/api/issues/${initialIssue.id}`,
+    fetcher,
+    {
+      refreshInterval: pollingActive ? 3000 : 0,
+      fallbackData: initialIssue,
+      onSuccess: (data) => {
+        // generating이 아니면 폴링 중지
+        if (data.ai_plan_status !== 'generating') {
+          setPollingActive(false);
+        }
+      },
+    },
+  );
+  const issue = issueData || initialIssue;
+  const [behaviorDraft, setBehaviorDraft] = useState(issue.behavior_example || '');
 
-  const handleAddComment = async () => {
-    if (!newComment.trim() || submittingComment) return;
-    setSubmittingComment(true);
-    try {
-      await fetcherWithOptions<Comment>(`/api/issues/${issue.id}/comments`, {
-        method: 'POST',
-        body: JSON.stringify({ content: newComment.trim() }),
-      });
-      setNewComment('');
-      mutateComments();
-      toast.success('댓글이 추가되었습니다.');
-    } catch {
-      toast.error('댓글 추가에 실패했습니다.');
-    } finally {
-      setSubmittingComment(false);
+  // behavior_example이 업데이트되면 draft도 업데이트
+  useEffect(() => {
+    if (!editingBehavior) {
+      setBehaviorDraft(issue.behavior_example || '');
     }
-  };
+  }, [issue.behavior_example, editingBehavior]);
 
   const handleSaveBehavior = async () => {
     try {
       await issueService.update(issue.id, { behavior_example: behaviorDraft });
-      issue.behavior_example = behaviorDraft;
+      mutateIssue();
       setEditingBehavior(false);
-      toast.success('동작 예시가 저장되었습니다.');
+      toast.success('작업 계획이 저장되었습니다.');
     } catch {
-      toast.error('동작 예시 저장에 실패했습니다.');
+      toast.error('작업 계획 저장에 실패했습니다.');
+    }
+  };
+
+  const handleRegeneratePlan = async () => {
+    setRegenerating(true);
+    try {
+      await fetcherWithOptions(`/api/issues/${issue.id}/generate-behavior`, {
+        method: 'POST',
+      });
+      setPollingActive(true);
+      mutateIssue();
+      toast.success('AI 작업 계획을 재생성합니다.');
+    } catch {
+      toast.error('작업 계획 재생성에 실패했습니다.');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  const handleGeneratePlan = async () => {
+    setRegenerating(true);
+    try {
+      await fetcherWithOptions(`/api/issues/${issue.id}/generate-behavior`, {
+        method: 'POST',
+      });
+      setPollingActive(true);
+      mutateIssue();
+      toast.success('AI 작업 계획 생성을 시작합니다.');
+    } catch {
+      toast.error('작업 계획 생성에 실패했습니다.');
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -201,24 +237,64 @@ export function IssueDetailModal({ issue, onClose, onEdit }: IssueDetailModalPro
             )}
           </div>
 
-          {/* 동작 예시 */}
+          {/* AI 작업 계획 */}
           <div className="px-6 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">동작 예시</h4>
-              {!editingBehavior && (
-                <button onClick={() => setEditingBehavior(true)} className="text-xs text-primary-600 hover:text-primary-700">
-                  수정
-                </button>
-              )}
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                AI 작업 계획
+              </h4>
+              <div className="flex items-center gap-2">
+                {!editingBehavior && issue.ai_plan_status === 'completed' && (
+                  <>
+                    <button
+                      onClick={() => setEditingBehavior(true)}
+                      className="text-xs text-primary-600 hover:text-primary-700"
+                    >
+                      수정
+                    </button>
+                    <button
+                      onClick={handleRegeneratePlan}
+                      disabled={regenerating}
+                      className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 disabled:opacity-50"
+                    >
+                      <RefreshCw className={clsx('w-3 h-3', regenerating && 'animate-spin')} />
+                      재생성
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-            {editingBehavior ? (
+
+            {/* generating 상태 */}
+            {(issue.ai_plan_status === 'generating') && (
+              <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg border border-purple-100">
+                <Loader2 className="w-5 h-5 text-purple-500 animate-spin shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-purple-700">AI가 작업 계획을 생성 중입니다...</p>
+                  <p className="text-xs text-purple-500 mt-0.5">잠시만 기다려주세요. 자동으로 업데이트됩니다.</p>
+                </div>
+              </div>
+            )}
+
+            {/* completed 상태 */}
+            {issue.ai_plan_status === 'completed' && !editingBehavior && (
+              <div className="prose prose-sm prose-gray max-w-none bg-gray-50 rounded-lg p-4 border border-gray-100">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {issue.behavior_example || ''}
+                </ReactMarkdown>
+              </div>
+            )}
+
+            {/* 수정 모드 */}
+            {editingBehavior && (
               <div className="space-y-2">
                 <textarea
                   value={behaviorDraft}
                   onChange={(e) => setBehaviorDraft(e.target.value)}
-                  rows={6}
-                  className="w-full text-sm text-gray-700 border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 resize-none"
-                  placeholder="에이전트에게 전달할 동작 예시를 입력하세요..."
+                  rows={10}
+                  className="w-full text-sm text-gray-700 border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 resize-none font-mono"
+                  placeholder="작업 계획을 수정하세요 (마크다운 지원)..."
                 />
                 <div className="flex gap-2 justify-end">
                   <button onClick={() => { setEditingBehavior(false); setBehaviorDraft(issue.behavior_example || ''); }} className="text-xs px-3 py-1 text-gray-600 hover:text-gray-800">
@@ -229,10 +305,65 @@ export function IssueDetailModal({ issue, onClose, onEdit }: IssueDetailModalPro
                   </button>
                 </div>
               </div>
-            ) : (
-              <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                {issue.behavior_example || '동작 예시가 없습니다.'}
-              </p>
+            )}
+
+            {/* failed 상태 */}
+            {issue.ai_plan_status === 'failed' && (
+              <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
+                <div className="flex items-center gap-2">
+                  <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+                  <p className="text-sm text-red-600">작업 계획 생성에 실패했습니다.</p>
+                </div>
+                <button
+                  onClick={handleGeneratePlan}
+                  disabled={regenerating}
+                  className="flex items-center gap-1 text-xs px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                >
+                  <RefreshCw className={clsx('w-3 h-3', regenerating && 'animate-spin')} />
+                  다시 생성
+                </button>
+              </div>
+            )}
+
+            {/* 미생성 상태 */}
+            {!issue.ai_plan_status && !issue.behavior_example && (
+              <button
+                onClick={handleGeneratePlan}
+                disabled={regenerating}
+                className="flex items-center gap-2 px-4 py-3 w-full bg-purple-50 text-purple-600 rounded-lg border border-purple-100 hover:bg-purple-100 transition-colors disabled:opacity-50"
+              >
+                <Sparkles className={clsx('w-4 h-4', regenerating && 'animate-pulse')} />
+                <span className="text-sm font-medium">
+                  {regenerating ? 'AI 작업 계획 생성 시작 중...' : 'AI 작업 계획 생성'}
+                </span>
+              </button>
+            )}
+
+            {/* behavior_example이 있지만 ai_plan_status가 없는 경우 (레거시) */}
+            {!issue.ai_plan_status && issue.behavior_example && !editingBehavior && (
+              <div className="space-y-2">
+                <div className="prose prose-sm prose-gray max-w-none bg-gray-50 rounded-lg p-4 border border-gray-100">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {issue.behavior_example}
+                  </ReactMarkdown>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setEditingBehavior(true)}
+                    className="text-xs text-primary-600 hover:text-primary-700"
+                  >
+                    수정
+                  </button>
+                  <button
+                    onClick={handleRegeneratePlan}
+                    disabled={regenerating}
+                    className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 disabled:opacity-50"
+                  >
+                    <RefreshCw className={clsx('w-3 h-3', regenerating && 'animate-spin')} />
+                    재생성
+                  </button>
+                </div>
+              </div>
             )}
           </div>
 
@@ -278,55 +409,6 @@ export function IssueDetailModal({ issue, onClose, onEdit }: IssueDetailModalPro
             )}
           </div>
 
-          {/* 댓글 */}
-          <div className="px-6 pb-6 border-t border-gray-100 pt-4">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">댓글</h4>
-
-            {/* 댓글 목록 */}
-            {loadingComments ? (
-              <div className="flex items-center gap-2 text-xs text-gray-400">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                로딩 중...
-              </div>
-            ) : comments && comments.length > 0 ? (
-              <div className="space-y-3">
-                {comments.map((comment) => (
-                  <div key={comment.id} className="p-3 bg-gray-50 rounded-md">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-gray-700">{comment.author}</span>
-                      <span className="text-[10px] text-gray-400">{formatRelativeTime(comment.created_at)}</span>
-                    </div>
-                    <p className="text-sm text-gray-600 whitespace-pre-wrap">{comment.content}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-3">
-                <AlertCircle className="w-3 h-3" />
-                댓글이 없습니다.
-              </div>
-            )}
-
-            {/* 댓글 입력 */}
-            <div className="mt-3">
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                rows={2}
-                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
-                placeholder="댓글을 입력하세요..."
-              />
-              <div className="flex justify-end mt-1">
-                <button
-                  onClick={handleAddComment}
-                  disabled={!newComment.trim() || submittingComment}
-                  className="text-xs px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
-                >
-                  {submittingComment ? '추가 중...' : '댓글 추가'}
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

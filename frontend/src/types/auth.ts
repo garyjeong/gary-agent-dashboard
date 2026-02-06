@@ -8,6 +8,7 @@ export interface User {
   github_login: string;
   github_name: string | null;
   github_avatar_url: string | null;
+  has_repo_token: boolean;
 }
 
 export interface AuthURLResponse {

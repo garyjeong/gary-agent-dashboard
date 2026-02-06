@@ -91,6 +91,7 @@ class IssueResponse(IssueBase):
     labels: List[LabelResponse] = []
     latest_queue_status: Optional[str] = None
     pr_status: Optional[str] = None
+    ai_plan_status: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

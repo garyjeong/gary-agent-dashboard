@@ -1,4 +1,5 @@
 """GitHub API 관련 스키마"""
+from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
 
@@ -88,6 +89,7 @@ class ConnectedRepoResponse(BaseModel):
     stargazers_count: int
     connected_at: str
     analysis_status: Optional[str] = None
+    deep_analysis_status: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -95,3 +97,40 @@ class ConnectedRepoResponse(BaseModel):
 class ConnectedRepoListResponse(BaseModel):
     """연동된 리포지토리 목록 응답"""
     items: List[ConnectedRepoResponse]
+
+
+# ── 심층 분석 스키마 ──────────────────────────────────────
+
+class DeepAnalysisSuggestionResponse(BaseModel):
+    """심층 분석 개선 제안 응답"""
+    id: int
+    category: str
+    severity: str
+    title: str
+    description: str
+    affected_files: Optional[str] = None
+    suggested_fix: Optional[str] = None
+    issue_id: Optional[int] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DeepAnalysisResponse(BaseModel):
+    """심층 분석 결과 응답"""
+    deep_analysis_status: Optional[str] = None
+    deep_analysis_result: Optional[str] = None
+    deep_analysis_error: Optional[str] = None
+    deep_analyzed_at: Optional[str] = None
+    suggestions: List[DeepAnalysisSuggestionResponse] = []
+
+
+class CreateIssuesFromSuggestionsRequest(BaseModel):
+    """개선 제안 → 이슈 일괄 생성 요청"""
+    suggestion_ids: List[int]
+
+
+class CreateIssuesFromSuggestionsResponse(BaseModel):
+    """이슈 일괄 생성 응답"""
+    created_count: int
+    issue_ids: List[int]
