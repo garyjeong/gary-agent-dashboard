@@ -36,6 +36,26 @@ class APIClient:
                 print(f"[API] 연결 오류: {e}")
                 return None
     
+    async def get_repo_analysis(self, repo_full_name: str) -> Optional[str]:
+        """리포지토리 분석 결과 가져오기"""
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/api/queue/repo-analysis/{repo_full_name}",
+                    headers=self.headers,
+                    timeout=30.0,
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    return data.get("analysis_result")
+                else:
+                    return None
+
+            except Exception as e:
+                print(f"[API] 분석 결과 조회 오류: {e}")
+                return None
+
     async def update_queue_item(
         self,
         item_id: int,

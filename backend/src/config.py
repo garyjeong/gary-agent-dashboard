@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     github_client_id: str = ""
     github_client_secret: str = ""
     
+    # Gemini API
+    gemini_api_key: str = ""
+
     # 텔레그램
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""

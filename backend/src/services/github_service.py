@@ -30,7 +30,7 @@ class GitHubService:
         params = {
             "client_id": settings.github_client_id,
             "redirect_uri": redirect_uri,
-            "scope": "repo read:user",
+            "scope": "public_repo read:user",
         }
         query = "&".join(f"{k}={v}" for k, v in params.items())
         return f"{GITHUB_AUTHORIZE_URL}?{query}"
@@ -135,8 +135,8 @@ class GitHubAPIService:
             "Accept": "application/vnd.github+json",
         }
 
-    async def get_repos(self, per_page: int = 30, page: int = 1) -> List[dict]:
-        """사용자 리포지토리 목록 조회"""
+    async def get_repos(self, per_page: int = 100, page: int = 1) -> List[dict]:
+        """사용자 리포지토리 목록 조회 (단일 페이지)"""
         response = await request_with_retry(
             "GET",
             f"{GITHUB_API_URL}/user/repos",
@@ -156,6 +156,23 @@ class GitHubAPIService:
             )
 
         return response.json()
+
+    async def get_all_repos(self) -> List[dict]:
+        """사용자의 전체 리포지토리 목록 조회 (모든 페이지 순회)"""
+        all_repos: List[dict] = []
+        page = 1
+        per_page = 100  # GitHub API 최대값
+
+        while True:
+            repos = await self.get_repos(per_page=per_page, page=page)
+            if not repos:
+                break
+            all_repos.extend(repos)
+            if len(repos) < per_page:
+                break
+            page += 1
+
+        return all_repos
 
     async def get_repo_structure(self, owner: str, repo: str, path: str = "") -> List[dict]:
         """리포지토리 디렉토리 구조 조회"""

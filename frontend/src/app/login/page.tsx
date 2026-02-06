@@ -61,10 +61,23 @@ export default function LoginPage() {
           Sign in with GitHub
         </button>
 
-        {/* 안내 */}
-        <p className="text-[11px] text-gray-300 mt-6 text-center leading-relaxed">
-          로그인 시 GitHub 리포지토리 접근 권한이 부여됩니다
-        </p>
+        {/* 권한 안내 */}
+        <div className="mt-6 w-full rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+          <p className="text-[11px] font-medium text-gray-500 mb-2">요청되는 권한</p>
+          <ul className="space-y-1.5">
+            <li className="flex items-start gap-2 text-[11px] text-gray-400">
+              <span className="w-1 h-1 rounded-full bg-gray-300 mt-1.5 flex-shrink-0" />
+              <span><span className="text-gray-500">public_repo</span> — 공개 리포지토리 읽기/쓰기</span>
+            </li>
+            <li className="flex items-start gap-2 text-[11px] text-gray-400">
+              <span className="w-1 h-1 rounded-full bg-gray-300 mt-1.5 flex-shrink-0" />
+              <span><span className="text-gray-500">read:user</span> — 프로필 정보 읽기 전용</span>
+            </li>
+          </ul>
+          <p className="text-[10px] text-gray-300 mt-2">
+            비공개 리포지토리에는 접근하지 않습니다.
+          </p>
+        </div>
       </div>
 
       {/* 푸터 */}

@@ -13,10 +13,10 @@ class AgentRunner:
         self.work_dir = Path(config.WORK_DIR)
         self.work_dir.mkdir(parents=True, exist_ok=True)
     
-    async def run(self, queue_item: dict) -> tuple[bool, str]:
+    async def run(self, queue_item: dict, repo_analysis: str | None = None) -> tuple[bool, str]:
         """
         큐 아이템을 처리하고 결과 반환
-        
+
         Returns:
             (성공여부, 결과메시지)
         """
@@ -26,20 +26,23 @@ class AgentRunner:
         description = issue.get("description", "")
         repo_full_name = issue.get("repo_full_name")
         behavior_example = issue.get("behavior_example", "")
-        
+
         print(f"\n{'='*60}")
         print(f"[에이전트] 작업 시작")
         print(f"  - 일감 ID: {issue_id}")
         print(f"  - 제목: {title}")
         print(f"  - 리포: {repo_full_name or '미지정'}")
+        if repo_analysis:
+            print(f"  - 프로젝트 분석: 포함됨")
         print(f"{'='*60}\n")
-        
+
         # 프롬프트 생성
         prompt = self._build_prompt(
             title=title,
             description=description,
             repo_full_name=repo_full_name,
             behavior_example=behavior_example,
+            repo_analysis=repo_analysis,
         )
         
         # 에이전트 타입에 따라 실행
@@ -56,41 +59,51 @@ class AgentRunner:
         description: str,
         repo_full_name: str | None,
         behavior_example: str,
+        repo_analysis: str | None = None,
     ) -> str:
         """에이전트에게 전달할 프롬프트 생성"""
         prompt_parts = [
             f"# 작업 요청: {title}",
             "",
         ]
-        
+
         if description:
             prompt_parts.extend([
                 "## 설명",
                 description,
                 "",
             ])
-        
+
         if repo_full_name:
             prompt_parts.extend([
                 "## 대상 리포지토리",
                 f"- {repo_full_name}",
                 "",
             ])
-        
+
+        if repo_analysis:
+            prompt_parts.extend([
+                "## 프로젝트 분석 (AI 생성)",
+                "아래는 이 프로젝트에 대한 사전 분석 결과입니다. 작업 시 참고하세요.",
+                "",
+                repo_analysis,
+                "",
+            ])
+
         if behavior_example:
             prompt_parts.extend([
                 "## 수행할 작업",
                 behavior_example,
                 "",
             ])
-        
+
         prompt_parts.extend([
             "## 지침",
             "- 위 작업을 수행해주세요.",
             "- 작업 완료 후 변경 사항을 커밋해주세요.",
             "- PR 생성이 필요하면 PR을 생성해주세요.",
         ])
-        
+
         return "\n".join(prompt_parts)
     
     async def _run_claude_code(

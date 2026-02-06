@@ -28,3 +28,29 @@ export interface RepoTreeResponse {
   truncated: boolean;
   tree: TreeItem[];
 }
+
+export interface ConnectedRepo {
+  id: number;
+  github_repo_id: number;
+  full_name: string;
+  name: string;
+  description: string | null;
+  language: string | null;
+  private: boolean;
+  html_url: string;
+  default_branch: string;
+  stargazers_count: number;
+  connected_at: string;
+  analysis_status: 'pending' | 'analyzing' | 'completed' | 'failed' | null;
+}
+
+export interface ConnectedRepoListResponse {
+  items: ConnectedRepo[];
+}
+
+export interface RepoAnalysis {
+  analysis_status: string;
+  analysis_result: string | null;
+  analysis_error: string | null;
+  analyzed_at: string | null;
+}

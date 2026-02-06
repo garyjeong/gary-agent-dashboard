@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import get_settings
 from src.database import get_db
 from src.models.queue_item import QueueItem, QueueStatus
+from src.models.connected_repo import ConnectedRepo
 from src.dependencies import get_queue_service
 from src.services.queue_service import QueueService
 from src.schemas.queue import QueueItemUpdate, QueueItemWithIssue, QueueStatsResponse
@@ -121,3 +122,29 @@ async def update_queue_item(
             )
 
     return queue_item
+
+
+@router.get("/repo-analysis/{full_name:path}")
+async def get_repo_analysis_for_worker(
+    full_name: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """워커용 리포지토리 분석 결과 조회 (API Key 인증)"""
+    result = await db.execute(
+        select(ConnectedRepo)
+        .where(ConnectedRepo.full_name == full_name)
+        .order_by(ConnectedRepo.connected_at.desc())
+        .limit(1)
+    )
+    repo = result.scalar_one_or_none()
+    if not repo or not repo.analysis_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="분석 결과를 찾을 수 없습니다",
+        )
+    return {
+        "full_name": repo.full_name,
+        "analysis_status": repo.analysis_status,
+        "analysis_result": repo.analysis_result,
+        "analyzed_at": repo.analyzed_at.isoformat() if repo.analyzed_at else None,
+    }

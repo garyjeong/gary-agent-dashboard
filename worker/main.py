@@ -74,8 +74,16 @@ class Worker:
         print(f"[{self._now()}] 작업 수신: #{item_id} - {issue_title}")
         
         try:
+            # 리포지토리 분석 결과 조회
+            repo_full_name = issue.get("repo_full_name")
+            repo_analysis = None
+            if repo_full_name:
+                repo_analysis = await self.api.get_repo_analysis(repo_full_name)
+                if repo_analysis:
+                    print(f"[{self._now()}] 프로젝트 분석 결과 로드 완료")
+
             # 에이전트 실행
-            success, result = await self.agent.run(queue_item)
+            success, result = await self.agent.run(queue_item, repo_analysis=repo_analysis)
             
             # 결과 업데이트
             status = "completed" if success else "failed"

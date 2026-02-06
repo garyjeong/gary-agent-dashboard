@@ -13,6 +13,8 @@ class RepoResponse(BaseModel):
     html_url: str
     default_branch: str
     updated_at: str
+    language: Optional[str] = None
+    stargazers_count: int = 0
 
 
 class RepoListResponse(BaseModel):
@@ -57,3 +59,39 @@ class GitHubIssueResponse(BaseModel):
     body: Optional[str] = None
     created_at: str
     updated_at: str
+
+
+class ConnectRepoRequest(BaseModel):
+    """리포지토리 연동 요청"""
+    github_repo_id: int
+    full_name: str
+    name: str
+    description: Optional[str] = None
+    language: Optional[str] = None
+    private: bool = False
+    html_url: str
+    default_branch: str = "main"
+    stargazers_count: int = 0
+
+
+class ConnectedRepoResponse(BaseModel):
+    """연동된 리포지토리 응답"""
+    id: int
+    github_repo_id: int
+    full_name: str
+    name: str
+    description: Optional[str] = None
+    language: Optional[str] = None
+    private: bool
+    html_url: str
+    default_branch: str
+    stargazers_count: int
+    connected_at: str
+    analysis_status: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class ConnectedRepoListResponse(BaseModel):
+    """연동된 리포지토리 목록 응답"""
+    items: List[ConnectedRepoResponse]
