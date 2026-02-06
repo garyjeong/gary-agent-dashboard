@@ -49,6 +49,9 @@ app = FastAPI(
     description="Jira형 일감 대시보드 + 에이전트 작업 큐 API",
     version="0.1.0",
     lifespan=lifespan,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 # CORS 설정

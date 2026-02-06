@@ -221,8 +221,8 @@
 ## 9. 문서화 (LOW Priority)
 
 ### 9.1 API 문서
-- [ ] FastAPI docs 설정 (`/api/docs`, `/api/redoc`)
-- [ ] 각 엔드포인트에 상세 docstring 추가
+- [x] FastAPI docs 설정 (`/api/docs`, `/api/redoc`)
+- [x] 각 엔드포인트에 상세 docstring 추가
 - **파일**: `backend/src/main.py`, 각 라우터 파일
 
 ### 9.2 README
@@ -240,12 +240,12 @@
 ## 10. 타입 안전성 (LOW Priority)
 
 ### 10.1 백엔드
-- [ ] GitHub API 응답 타입 정의 (`GithubRepo`, `GithubUser` 등)
-- [ ] 서비스 반환 타입 구체화
+- [x] GitHub API 응답 타입 정의 (`GithubRepo`, `GithubUser` 등)
+- [x] 서비스 반환 타입 구체화
 - **파일**: `backend/src/services/github_service.py:132-152`
 
 ### 10.2 프론트엔드
-- [ ] API 에러 응답 타입 정의 (`QueueError`, `QueueResponse<T>`)
+- [x] API 에러 응답 타입 정의 (`QueueError`, `QueueResponse<T>`)
 - **파일**: `frontend/src/types/queue.ts`
 
 ---
