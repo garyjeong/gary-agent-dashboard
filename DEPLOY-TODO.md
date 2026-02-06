@@ -95,7 +95,7 @@ fly secrets set -a gary-dashboard-api \
   - `queue_service.py`
 
 ### 5.3 에러 처리
-- [ ] (선택) 전역 예외 핸들러 추가
+- [x] (선택) 전역 예외 핸들러 추가 — `main.py`에 ValidationError + global exception handler 구현됨
 - [ ] (선택) 프로덕션 환경에서 스택 트레이스 숨김
 
 ---

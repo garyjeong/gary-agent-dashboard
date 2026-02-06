@@ -76,7 +76,7 @@
 - [x] 백엔드: `labels` 테이블 생성 (id, name, color)
 - [x] 백엔드: `issue_labels` 다대다 관계 테이블
 - [x] 프론트엔드: 라벨 선택 UI (멀티셀렉트)
-- [x] 프론트엔드: 라벨별 필터링
+- [ ] 프론트엔드: 라벨별 필터링
 - [x] 기본 라벨: bug (빨강), feature (파랑), refactor (노랑), docs (초록)
 - **파일**: `backend/src/models/label.py`, `backend/src/routes/labels.py`, `frontend/src/hooks/useLabels.ts`
 
@@ -119,8 +119,9 @@
 ## 5. 기능 구현 (MEDIUM Priority)
 
 ### 5.1 페이지네이션 UI
-- [x] 페이지 컨트롤 컴포넌트 구현
-- [x] URL 쿼리 파라미터로 페이지 상태 유지
+- [x] 백엔드: skip/limit 페이지네이션 지원
+- [ ] 프론트엔드: 페이지 컨트롤 컴포넌트 구현
+- [ ] URL 쿼리 파라미터로 페이지 상태 유지
 - **파일**: `frontend/src/components/issues/IssueBoard.tsx`
 
 ### 5.2 검색 기능
@@ -141,7 +142,7 @@
 ### 5.5 GitHub PR 연동
 - [x] 일감에 PR URL 필드 추가
 - [x] PR 생성 시 자동 연결 (에이전트 작업 결과)
-- [x] PR 상태 표시 (open, merged, closed)
+- [ ] PR 상태 표시 (open, merged, closed) — GitHub API 연동 필요
 - **파일**: `backend/src/models/issue.py`, `frontend/src/components/issues/IssueCard.tsx`
 
 ---
@@ -180,8 +181,8 @@
 - **파일**: 각 라우터 파일
 
 ### 7.2 프론트엔드 상태 관리
-- [x] Zustand 도입
-- [x] 필터 상태 전역화
+- [x] Zustand 도입 (스토어 생성)
+- [ ] 필터 상태 전역화 (IssueBoard에 Zustand 통합)
 - **파일**: `frontend/src/lib/store.ts` (신규)
 
 ### 7.3 컴포넌트 분리
@@ -284,6 +285,36 @@
 
 ### UI 컴포넌트
 - 커스텀 컴포넌트 시스템 (shadcn/ui 스타일 참고)
+
+---
+
+## 11. PROJECT.md 미구현 기능 (NEW)
+
+> PROJECT.md에 정의되었으나 아직 구현되지 않은 기능들
+
+### 11.1 일감 필드 확장
+- [ ] 담당자(assignee) 필드 추가 (백엔드 모델 + 스키마)
+- [ ] 담당자 선택 UI (프론트엔드)
+- [ ] 마감일(due_date) 필드 추가 (백엔드 모델 + 스키마)
+- [ ] 마감일 선택 UI (날짜 피커)
+- **파일**: `backend/src/models/issue.py`, `backend/src/schemas/issue.py`, `frontend/src/components/issues/IssueModal.tsx`
+
+### 11.2 댓글/활동 이력
+- [ ] 댓글(comments) 테이블 생성
+- [ ] 댓글 CRUD API
+- [ ] 프론트엔드: 댓글 입력/표시 UI (상세 모달 내)
+- **파일**: `backend/src/models/comment.py` (신규), `backend/src/routes/comments.py` (신규)
+
+### 11.3 GitHub 이슈 동기화
+- [ ] `GET /api/github/repos/{owner}/{repo}/issues` 엔드포인트
+- [ ] GitHub 이슈 ↔ 대시보드 일감 연결 매핑
+- [ ] 양방향 동기화 로직
+- **파일**: `backend/src/routes/github.py`, `backend/src/services/github_service.py`
+
+### 11.4 전용 페이지 구현
+- [ ] `/github` 페이지: 리포지토리 목록, 이슈 탐색 UI
+- [ ] `/issues` 페이지: 일감 테이블 뷰 (칸반 외 목록 형태)
+- **파일**: `frontend/src/app/github/page.tsx`, `frontend/src/app/issues/page.tsx`
 
 ---
 
