@@ -139,9 +139,9 @@
 - **파일**: `backend/src/services/behavior_generator.py` (신규)
 
 ### 5.5 GitHub PR 연동
-- [ ] 일감에 PR URL 필드 추가
+- [x] 일감에 PR URL 필드 추가
 - [ ] PR 생성 시 자동 연결 (에이전트 작업 결과)
-- [ ] PR 상태 표시 (open, merged, closed)
+- [x] PR 상태 표시 (open, merged, closed)
 - **파일**: `backend/src/models/issue.py`, `frontend/src/components/issues/IssueCard.tsx`
 
 ---
@@ -149,25 +149,25 @@
 ## 6. UX 개선 (MEDIUM Priority)
 
 ### 6.1 로딩 상태
-- [ ] 상태 변경 시 로딩 인디케이터
-- [ ] 버튼 disabled 상태 표시
+- [x] 상태 변경 시 로딩 인디케이터
+- [x] 버튼 disabled 상태 표시
 - [ ] 스켈레톤 로딩 UI
 - **파일**: `frontend/src/components/issues/IssueCard.tsx`
 
 ### 6.2 Optimistic Update
-- [ ] 상태 변경 시 즉시 UI 반영
-- [ ] 실패 시 롤백 처리
+- [x] 상태 변경 시 즉시 UI 반영
+- [x] 실패 시 롤백 처리
 - **파일**: `frontend/src/components/issues/IssueBoard.tsx`
 
 ### 6.3 데이터 페칭 최적화
-- [ ] `refreshInterval: 5000` 제거 (수동 새로고침만)
-- [ ] 새로고침 버튼 눈에 띄게 배치
-- [ ] 마지막 업데이트 시간 표시
+- [x] `refreshInterval: 5000` 제거 (수동 새로고침만)
+- [x] 새로고침 버튼 눈에 띄게 배치
+- [x] 마지막 업데이트 시간 표시
 - **파일**: `frontend/src/hooks/useIssues.ts:24-30`
 
 ### 6.4 빈 상태 처리
-- [ ] 일감이 없을 때 안내 메시지
-- [ ] 첫 일감 생성 유도 CTA
+- [x] 일감이 없을 때 안내 메시지
+- [x] 첫 일감 생성 유도 CTA
 - **파일**: `frontend/src/components/issues/IssueColumn.tsx`
 
 ---

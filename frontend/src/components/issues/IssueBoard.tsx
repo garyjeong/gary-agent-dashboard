@@ -148,7 +148,7 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
     setActiveIssue(issue ?? null);
   };
 
-  // 드래그 종료 → 상태 변경
+  // 드래그 종료 → 상태 변경 (낙관적 업데이트)
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveIssue(null);
@@ -161,10 +161,22 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
 
     if (!issue || issue.status === newStatus) return;
 
+    // 낙관적 업데이트: 로컬 캐시를 즉시 갱신
+    const optimisticData = {
+      items: issues.map((i) =>
+        i.id === issueId ? { ...i, status: newStatus } : i
+      ),
+      total: issues.length,
+    };
+    mutate(optimisticData, false);
+
     try {
       await issueService.update(issueId, { status: newStatus });
+      // 서버 응답으로 캐시 재검증
       mutate();
     } catch {
+      // 실패 시 서버 데이터로 롤백
+      mutate();
       toast.error('상태 변경에 실패했습니다.');
     }
   };

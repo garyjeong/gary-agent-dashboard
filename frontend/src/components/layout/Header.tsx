@@ -1,8 +1,23 @@
 'use client';
 
+import { useState, useCallback, useEffect } from 'react';
 import { Plus, RefreshCw, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '@/hooks';
 import { Button } from '@/components/ui';
+
+function formatLastUpdated(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+
+  if (diffSec < 5) return '방금 전';
+  if (diffSec < 60) return `${diffSec}초 전`;
+
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}분 전`;
+
+  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+}
 
 interface HeaderProps {
   title?: string;
@@ -13,6 +28,20 @@ interface HeaderProps {
 
 export function Header({ title = '일감 관리', onCreateClick, onRefresh, onMenuClick }: HeaderProps) {
   const { logout } = useAuth();
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [, setTick] = useState(0);
+
+  // 새로고침 시 타임스탬프 갱신
+  const handleRefresh = useCallback(() => {
+    onRefresh?.();
+    setLastUpdated(new Date());
+  }, [onRefresh]);
+
+  // 상대 시간 표시를 위해 주기적으로 리렌더링 (30초 간격)
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <header className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-4 lg:px-6">
@@ -49,7 +78,11 @@ export function Header({ title = '일감 관리', onCreateClick, onRefresh, onMe
           <Plus className="w-4 h-4" />
         </Button>
 
-        <Button variant="ghost" size="sm" onClick={onRefresh} className="w-8 h-8 p-0">
+        <span className="hidden sm:inline text-xs text-gray-400">
+          마지막 업데이트: {formatLastUpdated(lastUpdated)}
+        </span>
+
+        <Button variant="ghost" size="sm" onClick={handleRefresh} className="w-8 h-8 p-0">
           <RefreshCw className="w-4 h-4" />
         </Button>
 

@@ -40,6 +40,7 @@ class Issue(Base):
         nullable=False
     )
     repo_full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    pr_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     behavior_example: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, 

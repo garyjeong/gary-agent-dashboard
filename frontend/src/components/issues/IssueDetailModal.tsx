@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, GitBranch, Clock, CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
+import { X, GitBranch, ExternalLink, Clock, CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { clsx } from 'clsx';
@@ -80,6 +80,17 @@ export function IssueDetailModal({ issue, onClose, onEdit }: IssueDetailModalPro
                 <GitBranch className="w-3 h-3" />
                 {issue.repo_full_name}
               </span>
+            )}
+            {issue.pr_url && (
+              <a
+                href={issue.pr_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-primary-600 hover:text-primary-700"
+              >
+                <ExternalLink className="w-3 h-3" />
+                PR 링크
+              </a>
             )}
             <span>생성: {formatRelativeTime(issue.created_at)}</span>
             <span>수정: {formatRelativeTime(issue.updated_at)}</span>

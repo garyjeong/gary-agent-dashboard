@@ -18,6 +18,7 @@ export interface Issue {
   status: IssueStatus;
   priority: IssuePriority;
   repo_full_name: string | null;
+  pr_url: string | null;
   behavior_example: string | null;
   labels: Label[];
   created_at: string;
@@ -30,6 +31,7 @@ export interface IssueCreate {
   status?: IssueStatus;
   priority?: IssuePriority;
   repo_full_name?: string;
+  pr_url?: string;
   behavior_example?: string;
   label_ids?: number[];
 }
@@ -40,6 +42,7 @@ export interface IssueUpdate {
   status?: IssueStatus;
   priority?: IssuePriority;
   repo_full_name?: string;
+  pr_url?: string;
   behavior_example?: string;
   label_ids?: number[];
 }

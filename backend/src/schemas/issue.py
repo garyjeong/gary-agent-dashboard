@@ -9,6 +9,9 @@ from src.schemas.label import LabelResponse
 # GitHub owner/repo 형식: "owner/repo" (영문, 숫자, 하이픈, 점, 언더스코어)
 _REPO_FULL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
+# GitHub PR URL 형식
+_PR_URL_RE = re.compile(r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+$")
+
 
 class IssueBase(BaseModel):
     """일감 기본 스키마"""
@@ -17,6 +20,7 @@ class IssueBase(BaseModel):
     status: IssueStatus = IssueStatus.TODO
     priority: IssuePriority = IssuePriority.MEDIUM
     repo_full_name: Optional[str] = Field(None, max_length=255)
+    pr_url: Optional[str] = Field(None, max_length=500)
     behavior_example: Optional[str] = None
 
     @field_validator("repo_full_name")
@@ -28,6 +32,15 @@ class IssueBase(BaseModel):
             raise ValueError("허용되지 않는 경로입니다")
         if not _REPO_FULL_NAME_RE.match(v):
             raise ValueError("리포지토리 이름은 'owner/repo' 형식이어야 합니다")
+        return v
+
+    @field_validator("pr_url")
+    @classmethod
+    def validate_pr_url(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return v
+        if not _PR_URL_RE.match(v):
+            raise ValueError("PR URL은 'https://github.com/owner/repo/pull/번호' 형식이어야 합니다")
         return v
 
 
@@ -43,6 +56,7 @@ class IssueUpdate(BaseModel):
     status: Optional[IssueStatus] = None
     priority: Optional[IssuePriority] = None
     repo_full_name: Optional[str] = Field(None, max_length=255)
+    pr_url: Optional[str] = Field(None, max_length=500)
     behavior_example: Optional[str] = None
     label_ids: Optional[List[int]] = None
 
@@ -55,6 +69,15 @@ class IssueUpdate(BaseModel):
             raise ValueError("허용되지 않는 경로입니다")
         if not _REPO_FULL_NAME_RE.match(v):
             raise ValueError("리포지토리 이름은 'owner/repo' 형식이어야 합니다")
+        return v
+
+    @field_validator("pr_url")
+    @classmethod
+    def validate_pr_url(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return v
+        if not _PR_URL_RE.match(v):
+            raise ValueError("PR URL은 'https://github.com/owner/repo/pull/번호' 형식이어야 합니다")
         return v
 
 
