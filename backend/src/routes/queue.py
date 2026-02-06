@@ -1,4 +1,7 @@
 """작업 큐 라우터"""
+import re
+import logging
+
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +12,8 @@ from src.models.queue_item import QueueItem, QueueStatus
 from src.dependencies import get_queue_service
 from src.services.queue_service import QueueService
 from src.schemas.queue import QueueItemUpdate, QueueItemWithIssue, QueueStatsResponse
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -84,6 +89,7 @@ async def get_queue_item(
 async def update_queue_item(
     item_id: int,
     data: QueueItemUpdate,
+    db: AsyncSession = Depends(get_db),
     service: QueueService = Depends(get_queue_service),
 ):
     """큐 아이템 상태 업데이트 (에이전트/워커용)
@@ -91,8 +97,26 @@ async def update_queue_item(
     - status: completed, failed 등으로 변경
     - result: 작업 결과 또는 에러 메시지
     """
-    return await service.update_item_status(
+    queue_item = await service.update_item_status(
         item_id,
         data.status,
         data.result,
     )
+
+    # PR 자동 연결: 완료 시 result에서 PR URL 추출
+    if data.status == QueueStatus.COMPLETED and data.result:
+        pr_match = re.search(
+            r'https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+',
+            data.result,
+        )
+        if pr_match and not queue_item.issue.pr_url:
+            queue_item.issue.pr_url = pr_match.group()
+            await db.commit()
+            await db.refresh(queue_item)
+            logger.info(
+                "PR 자동 연결: issue_id=%d, pr_url=%s",
+                queue_item.issue_id,
+                pr_match.group(),
+            )
+
+    return queue_item

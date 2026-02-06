@@ -140,7 +140,7 @@
 
 ### 5.5 GitHub PR 연동
 - [x] 일감에 PR URL 필드 추가
-- [ ] PR 생성 시 자동 연결 (에이전트 작업 결과)
+- [x] PR 생성 시 자동 연결 (에이전트 작업 결과)
 - [x] PR 상태 표시 (open, merged, closed)
 - **파일**: `backend/src/models/issue.py`, `frontend/src/components/issues/IssueCard.tsx`
 
@@ -208,13 +208,13 @@
 - [x] `tests/test_auth.py` 작성
 
 ### 8.2 프론트엔드 테스트
-- [ ] Jest + React Testing Library 설정
-- [ ] 컴포넌트 단위 테스트 작성
-- [ ] Hook 테스트 작성
+- [x] Jest + React Testing Library 설정
+- [x] 컴포넌트 단위 테스트 작성
+- [x] Hook 테스트 작성
 
 ### 8.3 E2E 테스트
-- [ ] Playwright 설정
-- [ ] 핵심 사용자 플로우 테스트
+- [x] Playwright 설정
+- [x] 핵심 사용자 플로우 테스트
 
 ---
 
@@ -226,14 +226,14 @@
 - **파일**: `backend/src/main.py`, 각 라우터 파일
 
 ### 9.2 README
-- [ ] 프로젝트 루트 `README.md` 작성
-- [ ] 환경 설정 가이드
-- [ ] API 사용 예제
+- [x] 프로젝트 루트 `README.md` 작성
+- [x] 환경 설정 가이드
+- [x] API 사용 예제
 
 ### 9.3 개발 가이드
-- [ ] `CONTRIBUTING.md` 작성
-- [ ] 코드 스타일 가이드
-- [ ] Git 워크플로우
+- [x] `CONTRIBUTING.md` 작성
+- [x] 코드 스타일 가이드
+- [x] Git 워크플로우
 
 ---
 
