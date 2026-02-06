@@ -1,6 +1,7 @@
 'use client';
 
 import { LayoutDashboard, ListTodo, Settings, GitBranch, X } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
@@ -40,7 +41,10 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       >
         {/* 로고 */}
         <div className="h-14 flex items-center justify-between px-4 border-b border-gray-100">
-          <h1 className="text-base font-semibold text-gray-900">Gary</h1>
+          <Link href="/" className="flex items-center gap-2.5">
+            <Image src="/logo.svg" alt="Gary" width={28} height={28} />
+            <span className="text-base font-semibold text-gray-900">Gary</span>
+          </Link>
           <button
             onClick={onClose}
             className="p-1 text-gray-400 hover:text-gray-600 lg:hidden"
