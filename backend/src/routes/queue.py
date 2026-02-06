@@ -6,8 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import get_settings
 from src.database import get_db
 from src.models.queue_item import QueueItem, QueueStatus
-from src.repositories.issue_repository import IssueRepository
-from src.repositories.queue_repository import QueueRepository
+from src.dependencies import get_queue_service
 from src.services.queue_service import QueueService
 from src.schemas.queue import QueueItemUpdate, QueueItemWithIssue, QueueStatsResponse
 
@@ -35,10 +34,6 @@ router = APIRouter(
     tags=["queue"],
     dependencies=[Depends(require_api_key)],
 )
-
-
-def get_queue_service(db: AsyncSession = Depends(get_db)) -> QueueService:
-    return QueueService(QueueRepository(db), IssueRepository(db), db)
 
 
 @public_router.get("/stats", response_model=QueueStatsResponse)

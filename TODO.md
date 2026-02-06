@@ -175,8 +175,8 @@
 ## 7. 아키텍처 개선 (MEDIUM Priority)
 
 ### 7.1 의존성 주입 중앙화
-- [ ] `backend/src/dependencies.py` 생성
-- [ ] 서비스 초기화 로직 통합
+- [x] `backend/src/dependencies.py` 생성
+- [x] 서비스 초기화 로직 통합
 - **파일**: 각 라우터 파일
 
 ### 7.2 프론트엔드 상태 관리
@@ -189,12 +189,12 @@
 - **파일**: `frontend/src/components/issues/IssueModal.tsx`
 
 ### 7.4 트랜잭션 관리
-- [ ] 큐 상태 업데이트와 알림 전송 트랜잭션 처리
+- [x] 큐 상태 업데이트와 알림 전송 트랜잭션 처리
 - **파일**: `backend/src/services/queue_service.py:66-94`
 
 ### 7.5 쿼리 최적화
-- [ ] 필터 조건 중복 제거
-- [ ] WHERE 절 빌더 함수 추출
+- [x] 필터 조건 중복 제거
+- [x] WHERE 절 빌더 함수 추출
 - **파일**: `backend/src/repositories/issue_repository.py:29-58`
 
 ---

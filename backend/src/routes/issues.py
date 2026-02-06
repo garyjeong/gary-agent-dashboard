@@ -7,8 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
 from src.models.issue import IssueStatus, IssuePriority
 from src.models.queue_item import QueueItem
-from src.repositories.issue_repository import IssueRepository
-from src.repositories.queue_repository import QueueRepository
+from src.dependencies import get_issue_service, get_queue_service
 from src.services.issue_service import IssueService
 from src.services.queue_service import QueueService
 from src.schemas.issue import (
@@ -21,14 +20,6 @@ from src.schemas.queue import QueueItemResponse
 from src.models.issue import Issue as IssueModel
 
 router = APIRouter(prefix="/api/issues", tags=["issues"])
-
-
-def get_issue_service(db: AsyncSession = Depends(get_db)) -> IssueService:
-    return IssueService(IssueRepository(db), db=db)
-
-
-def get_queue_service(db: AsyncSession = Depends(get_db)) -> QueueService:
-    return QueueService(QueueRepository(db), IssueRepository(db))
 
 
 @router.post("", response_model=IssueResponse, status_code=201)

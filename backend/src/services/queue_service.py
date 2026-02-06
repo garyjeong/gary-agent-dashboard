@@ -83,13 +83,15 @@ class QueueService:
             result,
         )
 
-        # 완료/실패 시 텔레그램 알림 전송
+        # 완료/실패 시 텔레그램 알림 전송 (실패해도 상태 업데이트는 유지)
         if new_status in (QueueStatus.COMPLETED, QueueStatus.FAILED):
             try:
                 telegram_service = TelegramService(self.db)
-                await telegram_service.send_completion_notification(updated)
+                sent = await telegram_service.send_completion_notification(updated)
+                if not sent:
+                    logger.warning(f"텔레그램 알림 전송 미완료: item_id={item_id}")
             except Exception as e:
-                logger.error(f"텔레그램 알림 전송 실패: {e}")
+                logger.error(f"텔레그램 알림 전송 실패 (상태 업데이트는 완료됨): {e}")
 
         return updated
 
