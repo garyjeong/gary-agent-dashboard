@@ -36,6 +36,8 @@ class IssueService:
             repo_full_name=data.repo_full_name,
             pr_url=data.pr_url,
             behavior_example=data.behavior_example,
+            assignee=data.assignee,
+            due_date=data.due_date,
         )
         issue.labels = await self._resolve_labels(data.label_ids)
         return await self.repository.create(issue)

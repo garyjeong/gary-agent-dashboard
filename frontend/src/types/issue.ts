@@ -21,6 +21,8 @@ export interface Issue {
   pr_url: string | null;
   pr_status: string | null;
   behavior_example: string | null;
+  assignee: string | null;
+  due_date: string | null;
   labels: Label[];
   latest_queue_status: string | null;
   created_at: string;
@@ -35,6 +37,8 @@ export interface IssueCreate {
   repo_full_name?: string;
   pr_url?: string;
   behavior_example?: string;
+  assignee?: string;
+  due_date?: string;
   label_ids?: number[];
 }
 
@@ -46,6 +50,8 @@ export interface IssueUpdate {
   repo_full_name?: string;
   pr_url?: string;
   behavior_example?: string;
+  assignee?: string;
+  due_date?: string;
   label_ids?: number[];
 }
 

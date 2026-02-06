@@ -293,10 +293,10 @@
 > PROJECT.md에 정의되었으나 아직 구현되지 않은 기능들
 
 ### 11.1 일감 필드 확장
-- [ ] 담당자(assignee) 필드 추가 (백엔드 모델 + 스키마)
-- [ ] 담당자 선택 UI (프론트엔드)
-- [ ] 마감일(due_date) 필드 추가 (백엔드 모델 + 스키마)
-- [ ] 마감일 선택 UI (날짜 피커)
+- [x] 담당자(assignee) 필드 추가 (백엔드 모델 + 스키마)
+- [x] 담당자 선택 UI (프론트엔드)
+- [x] 마감일(due_date) 필드 추가 (백엔드 모델 + 스키마)
+- [x] 마감일 선택 UI (날짜 피커)
 - **파일**: `backend/src/models/issue.py`, `backend/src/schemas/issue.py`, `frontend/src/components/issues/IssueModal.tsx`
 
 ### 11.2 댓글/활동 이력
@@ -312,8 +312,8 @@
 - **파일**: `backend/src/routes/github.py`, `backend/src/services/github_service.py`
 
 ### 11.4 전용 페이지 구현
-- [ ] `/github` 페이지: 리포지토리 목록, 이슈 탐색 UI
-- [ ] `/issues` 페이지: 일감 테이블 뷰 (칸반 외 목록 형태)
+- [x] `/github` 페이지: 리포지토리 목록, 카드 그리드 UI
+- [x] `/issues` 페이지: 일감 테이블 뷰 (칸반 외 목록 형태)
 - **파일**: `frontend/src/app/github/page.tsx`, `frontend/src/app/issues/page.tsx`
 
 ---

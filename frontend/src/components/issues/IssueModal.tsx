@@ -26,6 +26,8 @@ export function IssueModal({ issue, onClose, onSubmit }: IssueModalProps) {
     repo_full_name: issue?.repo_full_name ?? '',
     behavior_example: issue?.behavior_example ?? '',
     label_ids: issue?.labels?.map((l: Label) => l.id) ?? [] as number[],
+    assignee: issue?.assignee ?? undefined as string | undefined,
+    due_date: issue?.due_date ?? undefined as string | undefined,
   });
 
   const [loading, setLoading] = useState(false);
@@ -40,6 +42,8 @@ export function IssueModal({ issue, onClose, onSubmit }: IssueModalProps) {
         description: formData.description || undefined,
         repo_full_name: formData.repo_full_name || undefined,
         behavior_example: formData.behavior_example || undefined,
+        assignee: formData.assignee || undefined,
+        due_date: formData.due_date || undefined,
         label_ids: formData.label_ids,
       });
     } finally {
@@ -134,6 +138,29 @@ export function IssueModal({ issue, onClose, onSubmit }: IssueModalProps) {
                   <option value="medium">보통</option>
                   <option value="high">높음</option>
                 </select>
+              </div>
+            </div>
+
+            {/* 담당자 & 마감일 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">담당자</label>
+                <input
+                  type="text"
+                  value={formData.assignee || ''}
+                  onChange={(e) => setFormData({ ...formData, assignee: e.target.value || undefined })}
+                  className="input"
+                  placeholder="담당자 이름 (선택)"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">마감일</label>
+                <input
+                  type="date"
+                  value={formData.due_date ? formData.due_date.split('T')[0] : ''}
+                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value ? `${e.target.value}T00:00:00` : undefined })}
+                  className="input"
+                />
               </div>
             </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { MoreVertical, Play, Pencil, Trash2, GitBranch, GripVertical } from 'lucide-react';
+import { MoreVertical, Play, Pencil, Trash2, GitBranch, GripVertical, User, Calendar } from 'lucide-react';
 import { useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { clsx } from 'clsx';
@@ -167,6 +167,24 @@ export function IssueCard({
                 {label.name}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* 담당자 + 마감일 */}
+        {(issue.assignee || issue.due_date) && (
+          <div className="flex items-center gap-3 mt-2 text-2xs text-gray-400">
+            {issue.assignee && (
+              <span className="flex items-center gap-1">
+                <User className="w-3 h-3" />
+                {issue.assignee}
+              </span>
+            )}
+            {issue.due_date && (
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {new Date(issue.due_date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+              </span>
+            )}
           </div>
         )}
 

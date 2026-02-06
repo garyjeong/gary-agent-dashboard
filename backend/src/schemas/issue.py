@@ -22,6 +22,8 @@ class IssueBase(BaseModel):
     repo_full_name: Optional[str] = Field(None, max_length=255)
     pr_url: Optional[str] = Field(None, max_length=500)
     behavior_example: Optional[str] = None
+    assignee: Optional[str] = Field(None, max_length=100)
+    due_date: Optional[datetime] = None
 
     @field_validator("repo_full_name")
     @classmethod
@@ -58,6 +60,8 @@ class IssueUpdate(BaseModel):
     repo_full_name: Optional[str] = Field(None, max_length=255)
     pr_url: Optional[str] = Field(None, max_length=500)
     behavior_example: Optional[str] = None
+    assignee: Optional[str] = Field(None, max_length=100)
+    due_date: Optional[datetime] = None
     label_ids: Optional[List[int]] = None
 
     @field_validator("repo_full_name")

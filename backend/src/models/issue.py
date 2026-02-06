@@ -43,6 +43,8 @@ class Issue(Base):
     pr_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     pr_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # open, merged, closed
     behavior_example: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    assignee: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, 
         default=datetime.utcnow,
