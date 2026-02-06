@@ -2,9 +2,9 @@
 
 import { X } from 'lucide-react';
 import { useState } from 'react';
-import { useRepos, useAuth } from '@/hooks';
+import { useRepos, useAuth, useLabels } from '@/hooks';
 import { Button } from '@/components/ui';
-import type { Issue, IssueCreate, IssueUpdate, IssueStatus, IssuePriority } from '@/types';
+import type { Issue, IssueCreate, IssueUpdate, IssueStatus, IssuePriority, Label } from '@/types';
 
 interface IssueModalProps {
   issue?: Issue;
@@ -16,6 +16,7 @@ export function IssueModal({ issue, onClose, onSubmit }: IssueModalProps) {
   const isEdit = !!issue;
   const { isLoggedIn } = useAuth();
   const { repos } = useRepos();
+  const { labels: availableLabels } = useLabels();
 
   const [formData, setFormData] = useState({
     title: issue?.title ?? '',
@@ -24,6 +25,7 @@ export function IssueModal({ issue, onClose, onSubmit }: IssueModalProps) {
     priority: issue?.priority ?? 'medium' as IssuePriority,
     repo_full_name: issue?.repo_full_name ?? '',
     behavior_example: issue?.behavior_example ?? '',
+    label_ids: issue?.labels?.map((l: Label) => l.id) ?? [] as number[],
   });
 
   const [loading, setLoading] = useState(false);
@@ -38,6 +40,7 @@ export function IssueModal({ issue, onClose, onSubmit }: IssueModalProps) {
         description: formData.description || undefined,
         repo_full_name: formData.repo_full_name || undefined,
         behavior_example: formData.behavior_example || undefined,
+        label_ids: formData.label_ids,
       });
     } finally {
       setLoading(false);
@@ -133,6 +136,42 @@ export function IssueModal({ issue, onClose, onSubmit }: IssueModalProps) {
                 </select>
               </div>
             </div>
+
+            {/* 라벨 */}
+            {availableLabels.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  라벨
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {availableLabels.map((label) => {
+                    const selected = formData.label_ids.includes(label.id);
+                    return (
+                      <button
+                        key={label.id}
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            label_ids: selected
+                              ? formData.label_ids.filter((id) => id !== label.id)
+                              : [...formData.label_ids, label.id],
+                          });
+                        }}
+                        className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-all border"
+                        style={{
+                          backgroundColor: selected ? `${label.color}20` : 'transparent',
+                          color: selected ? label.color : '#6B7280',
+                          borderColor: selected ? label.color : '#E5E7EB',
+                        }}
+                      >
+                        {label.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* GitHub 연동 */}

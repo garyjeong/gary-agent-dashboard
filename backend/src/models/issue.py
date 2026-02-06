@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
 from src.database import Base
+from src.models.label import issue_labels
 
 
 class IssueStatus(str, enum.Enum):
@@ -57,4 +58,9 @@ class Issue(Base):
         "QueueItem",
         back_populates="issue",
         cascade="all, delete-orphan"
+    )
+    labels: Mapped[List["Label"]] = relationship(
+        "Label",
+        secondary=issue_labels,
+        lazy="selectin",
     )

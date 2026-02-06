@@ -5,6 +5,12 @@
 export type IssueStatus = 'todo' | 'in_progress' | 'done';
 export type IssuePriority = 'low' | 'medium' | 'high';
 
+export interface Label {
+  id: number;
+  name: string;
+  color: string;
+}
+
 export interface Issue {
   id: number;
   title: string;
@@ -13,6 +19,7 @@ export interface Issue {
   priority: IssuePriority;
   repo_full_name: string | null;
   behavior_example: string | null;
+  labels: Label[];
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +31,7 @@ export interface IssueCreate {
   priority?: IssuePriority;
   repo_full_name?: string;
   behavior_example?: string;
+  label_ids?: number[];
 }
 
 export interface IssueUpdate {
@@ -33,6 +41,7 @@ export interface IssueUpdate {
   priority?: IssuePriority;
   repo_full_name?: string;
   behavior_example?: string;
+  label_ids?: number[];
 }
 
 export interface IssueListResponse {

@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/issues", tags=["issues"])
 
 
 def get_issue_service(db: AsyncSession = Depends(get_db)) -> IssueService:
-    return IssueService(IssueRepository(db))
+    return IssueService(IssueRepository(db), db=db)
 
 
 def get_queue_service(db: AsyncSession = Depends(get_db)) -> QueueService:

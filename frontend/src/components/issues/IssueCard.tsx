@@ -121,6 +121,25 @@ export function IssueCard({
           </p>
         )}
 
+        {/* 라벨 */}
+        {issue.labels && issue.labels.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {issue.labels.map((label) => (
+              <span
+                key={label.id}
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium"
+                style={{
+                  backgroundColor: `${label.color}18`,
+                  color: label.color,
+                  border: `1px solid ${label.color}30`,
+                }}
+              >
+                {label.name}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* 하단: 우선순위 + 시간 */}
         <div className="flex items-center justify-between mt-3">
           <Badge

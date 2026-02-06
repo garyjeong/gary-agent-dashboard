@@ -21,6 +21,7 @@ from src.schemas.github import (
     TreeItemResponse,
     RepoTreeResponse,
 )
+from src.schemas.error import ErrorResponse
 
 __all__ = [
     "IssueCreate",
@@ -37,4 +38,5 @@ __all__ = [
     "RepoListResponse",
     "TreeItemResponse",
     "RepoTreeResponse",
+    "ErrorResponse",
 ]

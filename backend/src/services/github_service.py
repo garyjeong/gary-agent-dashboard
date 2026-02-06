@@ -179,24 +179,27 @@ class GitHubAPIService:
 
             return response.json()
 
+    _FALLBACK_BRANCHES = ["main", "master"]
+
     async def get_repo_tree(self, owner: str, repo: str, branch: str = "main") -> dict:
-        """리포지토리 전체 트리 조회"""
+        """리포지토리 전체 트리 조회 (main → master 순으로 시도)"""
         self._validate_owner_repo(owner, repo)
 
+        branches_to_try = (
+            self._FALLBACK_BRANCHES if branch == "main" else [branch]
+        )
+
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/git/trees/{branch}?recursive=1"
-            response = await client.get(url, headers=self.headers)
+            for b in branches_to_try:
+                url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/git/trees/{b}?recursive=1"
+                response = await client.get(url, headers=self.headers)
+                if response.status_code == 200:
+                    return response.json()
 
-            if response.status_code != 200:
-                # main 브랜치 없으면 master 시도
-                if branch == "main":
-                    return await self.get_repo_tree(owner, repo, "master")
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail="리포지토리 트리 조회 실패"
-                )
-
-            return response.json()
+            raise HTTPException(
+                status_code=response.status_code,
+                detail="리포지토리 트리 조회 실패"
+            )
 
     def _validate_owner_repo(self, owner: str, repo: str) -> None:
         """owner/repo 입력값 검증"""

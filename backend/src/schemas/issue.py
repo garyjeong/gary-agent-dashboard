@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
 from src.models.issue import IssueStatus, IssuePriority
+from src.schemas.label import LabelResponse
 
 # GitHub owner/repo 형식: "owner/repo" (영문, 숫자, 하이픈, 점, 언더스코어)
 _REPO_FULL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -32,7 +33,7 @@ class IssueBase(BaseModel):
 
 class IssueCreate(IssueBase):
     """일감 생성 스키마"""
-    pass
+    label_ids: List[int] = []
 
 
 class IssueUpdate(BaseModel):
@@ -43,6 +44,7 @@ class IssueUpdate(BaseModel):
     priority: Optional[IssuePriority] = None
     repo_full_name: Optional[str] = Field(None, max_length=255)
     behavior_example: Optional[str] = None
+    label_ids: Optional[List[int]] = None
 
     @field_validator("repo_full_name")
     @classmethod
@@ -59,6 +61,7 @@ class IssueUpdate(BaseModel):
 class IssueResponse(IssueBase):
     """일감 응답 스키마"""
     id: int
+    labels: List[LabelResponse] = []
     created_at: datetime
     updated_at: datetime
 

@@ -30,7 +30,7 @@
 - **파일**: `backend/src/crypto.py`, `backend/src/services/github_service.py`, `backend/src/routes/github.py`
 
 ### 1.5 CORS 설정 강화
-- [ ] `allow_methods`, `allow_headers` 명시적 지정
+- [x] `allow_methods`, `allow_headers` 명시적 지정
 - **파일**: `backend/src/main.py:30-36`
 
 ---
@@ -73,12 +73,12 @@
 - **파일**: `frontend/src/components/issues/IssueBoard.tsx`, `frontend/src/components/issues/IssueColumn.tsx`
 
 ### 3.2 라벨/태그 시스템
-- [ ] 백엔드: `labels` 테이블 생성 (id, name, color)
-- [ ] 백엔드: `issue_labels` 다대다 관계 테이블
-- [ ] 프론트엔드: 라벨 선택 UI (멀티셀렉트)
-- [ ] 프론트엔드: 라벨별 필터링
-- [ ] 기본 라벨: bug (빨강), feature (파랑), refactor (노랑), docs (초록)
-- **파일**: `backend/src/models/label.py` (신규), `frontend/src/components/issues/LabelSelector.tsx` (신규)
+- [x] 백엔드: `labels` 테이블 생성 (id, name, color)
+- [x] 백엔드: `issue_labels` 다대다 관계 테이블
+- [x] 프론트엔드: 라벨 선택 UI (멀티셀렉트)
+- [x] 프론트엔드: 라벨별 필터링
+- [x] 기본 라벨: bug (빨강), feature (파랑), refactor (노랑), docs (초록)
+- **파일**: `backend/src/models/label.py`, `backend/src/routes/labels.py`, `frontend/src/hooks/useLabels.ts`
 
 ### 3.3 일감 상세 모달 개선
 - [ ] 에이전트 작업 이력 타임라인 표시
@@ -98,10 +98,10 @@
 ## 4. 에러 처리 (HIGH Priority)
 
 ### 4.1 백엔드 에러 핸들링
-- [ ] 공통 에러 응답 모델 (`ErrorResponse`) 정의
-- [ ] 글로벌 예외 핸들러 추가
-- [ ] GitHub API 재귀 호출 시 무한 루프 방지
-- **파일**: `backend/src/services/github_service.py:160-188`
+- [x] 공통 에러 응답 모델 (`ErrorResponse`) 정의
+- [x] 글로벌 예외 핸들러 추가
+- [x] GitHub API 재귀 호출 시 무한 루프 방지
+- **파일**: `backend/src/schemas/error.py`, `backend/src/main.py`, `backend/src/services/github_service.py`
 
 ### 4.2 프론트엔드 에러 표시
 - [ ] Toast 컴포넌트 구현 (성공/에러/경고)
