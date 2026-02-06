@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
 from src.crypto import encrypt_token
+from src.http_client import request_with_retry, DEFAULT_TIMEOUT
 from src.models.user import User
 
 settings = get_settings()
@@ -15,7 +16,7 @@ settings = get_settings()
 GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize"
 GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
 GITHUB_API_URL = "https://api.github.com"
-HTTP_TIMEOUT = 20.0
+HTTP_TIMEOUT = DEFAULT_TIMEOUT
 
 
 class GitHubService:
@@ -136,48 +137,47 @@ class GitHubAPIService:
 
     async def get_repos(self, per_page: int = 30, page: int = 1) -> List[dict]:
         """사용자 리포지토리 목록 조회"""
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            response = await client.get(
-                f"{GITHUB_API_URL}/user/repos",
-                headers=self.headers,
-                params={
-                    "per_page": per_page,
-                    "page": page,
-                    "sort": "updated",
-                    "direction": "desc",
-                },
+        response = await request_with_retry(
+            "GET",
+            f"{GITHUB_API_URL}/user/repos",
+            headers=self.headers,
+            params={
+                "per_page": per_page,
+                "page": page,
+                "sort": "updated",
+                "direction": "desc",
+            },
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail="리포지토리 목록 조회 실패"
             )
 
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail="리포지토리 목록 조회 실패"
-                )
-
-            return response.json()
+        return response.json()
 
     async def get_repo_structure(self, owner: str, repo: str, path: str = "") -> List[dict]:
         """리포지토리 디렉토리 구조 조회"""
         self._validate_owner_repo(owner, repo)
         self._validate_path(path)
 
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/contents/{path}"
-            response = await client.get(url, headers=self.headers)
+        url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/contents/{path}"
+        response = await request_with_retry("GET", url, headers=self.headers)
 
-            if response.status_code == 404:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="리포지토리 또는 경로를 찾을 수 없습니다"
-                )
+        if response.status_code == 404:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="리포지토리 또는 경로를 찾을 수 없습니다"
+            )
 
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail="리포지토리 구조 조회 실패"
-                )
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail="리포지토리 구조 조회 실패"
+            )
 
-            return response.json()
+        return response.json()
 
     _FALLBACK_BRANCHES = ["main", "master"]
 
@@ -189,17 +189,17 @@ class GitHubAPIService:
             self._FALLBACK_BRANCHES if branch == "main" else [branch]
         )
 
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            for b in branches_to_try:
-                url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/git/trees/{b}?recursive=1"
-                response = await client.get(url, headers=self.headers)
-                if response.status_code == 200:
-                    return response.json()
+        response = None
+        for b in branches_to_try:
+            url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/git/trees/{b}?recursive=1"
+            response = await request_with_retry("GET", url, headers=self.headers)
+            if response.status_code == 200:
+                return response.json()
 
-            raise HTTPException(
-                status_code=response.status_code,
-                detail="리포지토리 트리 조회 실패"
-            )
+        raise HTTPException(
+            status_code=response.status_code if response else 500,
+            detail="리포지토리 트리 조회 실패"
+        )
 
     def _validate_owner_repo(self, owner: str, repo: str) -> None:
         """owner/repo 입력값 검증"""

@@ -110,8 +110,8 @@
 - **파일**: `frontend/src/components/ui/Toast.tsx` (신규)
 
 ### 4.3 타임아웃 및 재시도
-- [ ] httpx 클라이언트 타임아웃 설정
-- [ ] 네트워크 실패 시 재시도 로직 (exponential backoff)
+- [x] httpx 클라이언트 타임아웃 설정
+- [x] 네트워크 실패 시 재시도 로직 (exponential backoff)
 - **파일**: `backend/src/services/github_service.py`, `backend/src/services/telegram_service.py`
 
 ---

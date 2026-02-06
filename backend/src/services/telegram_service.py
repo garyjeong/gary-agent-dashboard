@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
+from src.http_client import request_with_retry
 from src.models.setting import Setting
 from src.models.queue_item import QueueItem
 
@@ -13,7 +14,6 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 TELEGRAM_API_URL = "https://api.telegram.org"
-HTTP_TIMEOUT = 15.0
 
 # 기본 템플릿
 DEFAULT_TEMPLATE = """🎉 *작업 완료 알림*
@@ -64,21 +64,23 @@ class TelegramService:
         url = f"{TELEGRAM_API_URL}/bot{self.bot_token}/sendMessage"
 
         try:
-            async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-                response = await client.post(
-                    url,
-                    json={
-                        "chat_id": target_chat_id,
-                        "text": text,
-                        "parse_mode": parse_mode,
-                    },
-                )
+            response = await request_with_retry(
+                "POST",
+                url,
+                json={
+                    "chat_id": target_chat_id,
+                    "text": text,
+                    "parse_mode": parse_mode,
+                },
+                timeout=15.0,
+                max_retries=2,
+            )
 
-                if response.status_code == 200:
-                    return True
-                else:
-                    logger.error(f"텔레그램 전송 실패: {response.status_code}")
-                    return False
+            if response.status_code == 200:
+                return True
+            else:
+                logger.error(f"텔레그램 전송 실패: {response.status_code}")
+                return False
         except Exception as e:
             logger.error(f"텔레그램 전송 에러: {e}")
             return False
