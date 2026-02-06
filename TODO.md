@@ -129,8 +129,8 @@
 - **파일**: `backend/src/routes/issues.py`, `backend/src/repositories/issue_repository.py`
 
 ### 5.3 큐 통계 API
-- [ ] `GET /api/queue/stats` 엔드포인트 추가
-- [ ] 대시보드에 큐 상태 위젯 표시
+- [x] `GET /api/queue/stats` 엔드포인트 추가
+- [x] 대시보드에 큐 상태 위젯 표시
 - **파일**: `backend/src/routes/queue.py`
 
 ### 5.4 동작 예시 자동 생성

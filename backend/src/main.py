@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from src.config import get_settings
 from src.database import init_db
-from src.routes import issues_router, queue_router, auth_router, github_router, settings_router, labels_router
+from src.routes import issues_router, queue_router, queue_public_router, auth_router, github_router, settings_router, labels_router
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +82,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # 라우터 등록
 app.include_router(issues_router)
+app.include_router(queue_public_router)
 app.include_router(queue_router)
 app.include_router(auth_router)
 app.include_router(github_router)

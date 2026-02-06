@@ -36,3 +36,12 @@ class QueueItemResponse(BaseModel):
 class QueueItemWithIssue(QueueItemResponse):
     """일감 정보 포함 큐 아이템"""
     issue: IssueResponse
+
+
+class QueueStatsResponse(BaseModel):
+    """큐 통계 응답"""
+    pending: int = 0
+    in_progress: int = 0
+    completed: int = 0
+    failed: int = 0
+    total: int = 0

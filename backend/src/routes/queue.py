@@ -1,13 +1,15 @@
 """작업 큐 라우터"""
 from fastapi import APIRouter, Depends, Header, HTTPException, status
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
 from src.database import get_db
+from src.models.queue_item import QueueItem, QueueStatus
 from src.repositories.issue_repository import IssueRepository
 from src.repositories.queue_repository import QueueRepository
 from src.services.queue_service import QueueService
-from src.schemas.queue import QueueItemUpdate, QueueItemWithIssue
+from src.schemas.queue import QueueItemUpdate, QueueItemWithIssue, QueueStatsResponse
 
 settings = get_settings()
 
@@ -26,6 +28,8 @@ async def require_api_key(x_api_key: str = Header(default="")):
         )
 
 
+public_router = APIRouter(prefix="/api/queue", tags=["queue"])
+
 router = APIRouter(
     prefix="/api/queue",
     tags=["queue"],
@@ -35,6 +39,25 @@ router = APIRouter(
 
 def get_queue_service(db: AsyncSession = Depends(get_db)) -> QueueService:
     return QueueService(QueueRepository(db), IssueRepository(db), db)
+
+
+@public_router.get("/stats", response_model=QueueStatsResponse)
+async def get_queue_stats(
+    db: AsyncSession = Depends(get_db),
+):
+    """큐 상태 통계 조회"""
+    result = await db.execute(
+        select(QueueItem.status, func.count(QueueItem.id))
+        .group_by(QueueItem.status)
+    )
+    counts = {row[0].value: row[1] for row in result.all()}
+    return QueueStatsResponse(
+        pending=counts.get("pending", 0),
+        in_progress=counts.get("in_progress", 0),
+        completed=counts.get("completed", 0),
+        failed=counts.get("failed", 0),
+        total=sum(counts.values()),
+    )
 
 
 @router.get("/next", response_model=QueueItemWithIssue, responses={200: {"model": QueueItemWithIssue}, 204: {"description": "No pending items"}})
