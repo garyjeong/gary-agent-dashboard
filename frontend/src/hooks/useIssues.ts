@@ -25,7 +25,8 @@ export function useIssues(params?: UseIssuesParams) {
     url,
     fetcher,
     {
-      refreshInterval: 5000, // 5초마다 갱신
+      // 수동 새로고침 중심으로 동작 (Header에서 Refresh 버튼 사용)
+      revalidateOnFocus: true,
     }
   );
   

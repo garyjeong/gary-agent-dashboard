@@ -1,7 +1,7 @@
 """작업 큐 스키마"""
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from src.models.queue_item import QueueStatus
 from src.schemas.issue import IssueResponse
 
@@ -9,13 +9,13 @@ from src.schemas.issue import IssueResponse
 class QueueItemCreate(BaseModel):
     """큐 아이템 생성 (작업 요청 시)"""
     issue_id: int
-    priority: int = 0
+    priority: int = Field(default=0, ge=0, le=100)
 
 
 class QueueItemUpdate(BaseModel):
     """큐 아이템 상태 업데이트"""
     status: QueueStatus
-    result: Optional[str] = None
+    result: Optional[str] = Field(None, max_length=50000)
 
 
 class QueueItemResponse(BaseModel):

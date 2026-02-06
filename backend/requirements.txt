@@ -18,3 +18,9 @@ python-dotenv==1.0.1
 
 # CORS
 python-multipart==0.0.17
+
+# JWT 인증
+PyJWT==2.9.0
+
+# 토큰 암호화
+cryptography==44.0.0

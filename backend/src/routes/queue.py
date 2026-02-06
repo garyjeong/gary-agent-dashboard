@@ -1,15 +1,36 @@
 """작업 큐 라우터"""
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import get_settings
 from src.database import get_db
 from src.repositories.issue_repository import IssueRepository
 from src.repositories.queue_repository import QueueRepository
 from src.services.queue_service import QueueService
 from src.schemas.queue import QueueItemUpdate, QueueItemWithIssue
 
-router = APIRouter(prefix="/api/queue", tags=["queue"])
+settings = get_settings()
+
+
+async def require_api_key(x_api_key: str = Header(default="")):
+    """워커 전용 API Key 검증"""
+    if not settings.api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="API Key가 설정되지 않았습니다",
+        )
+    if x_api_key != settings.api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효하지 않은 API Key",
+        )
+
+
+router = APIRouter(
+    prefix="/api/queue",
+    tags=["queue"],
+    dependencies=[Depends(require_api_key)],
+)
 
 
 def get_queue_service(db: AsyncSession = Depends(get_db)) -> QueueService:

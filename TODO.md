@@ -8,16 +8,16 @@
 ## 1. 보안 (HIGH Priority)
 
 ### 1.1 세션 관리 개선
-- [ ] 메모리 기반 세션을 JWT로 교체
-- [ ] 세션 타임아웃 관리 구현 (7일 → 갱신 토큰 방식)
-- [ ] `secure=True` 쿠키 옵션 추가 (HTTPS 환경)
-- **파일**: `backend/src/routes/auth.py:14-58`
+- [x] 메모리 기반 세션을 JWT로 교체
+- [x] 세션 타임아웃 관리 구현 (7일 → 갱신 토큰 방식)
+- [x] `secure=True` 쿠키 옵션 추가 (HTTPS 환경)
+- **파일**: `backend/src/auth.py`, `backend/src/routes/auth.py`
 
 ### 1.2 입력 검증 강화
-- [ ] GitHub owner/repo 경로 검증 (Path Traversal 방지)
-- [ ] Telegram 메시지 템플릿 이스케이프 처리
-- [ ] Pydantic validator 추가
-- **파일**: `backend/src/routes/github.py:92-102`, `backend/src/services/telegram_service.py:136-152`
+- [x] GitHub owner/repo 경로 검증 (Path Traversal 방지)
+- [x] Telegram 메시지 템플릿 이스케이프 처리
+- [x] Pydantic validator 추가
+- **파일**: `backend/src/schemas/issue.py`, `backend/src/schemas/queue.py`, `backend/src/services/telegram_service.py`
 
 ### 1.3 API 인증 구현
 - [ ] `/api/queue/*` 엔드포인트에 API Key 인증 추가
@@ -25,9 +25,9 @@
 - **파일**: `backend/src/routes/queue.py:19-32`
 
 ### 1.4 GitHub 토큰 암호화
-- [ ] 데이터베이스 저장 시 토큰 암호화
-- [ ] Fernet 또는 유사 라이브러리 사용
-- **파일**: `backend/src/models/user.py`
+- [x] 데이터베이스 저장 시 토큰 암호화
+- [x] Fernet 또는 유사 라이브러리 사용
+- **파일**: `backend/src/crypto.py`, `backend/src/services/github_service.py`, `backend/src/routes/github.py`
 
 ### 1.5 CORS 설정 강화
 - [ ] `allow_methods`, `allow_headers` 명시적 지정

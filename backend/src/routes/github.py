@@ -1,45 +1,29 @@
 """GitHub API 라우터"""
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Cookie, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
 from src.services.github_service import GitHubService, GitHubAPIService
 from src.schemas.github import RepoResponse, RepoListResponse, RepoTreeResponse, TreeItemResponse
-from src.routes.auth import sessions
+from src.auth import require_current_user
+from src.crypto import decrypt_token
+from src.models.user import User
 
 router = APIRouter(prefix="/api/github", tags=["github"])
 
 
-async def get_current_user_token(
-    session_id: Optional[str] = Cookie(default=None),
-    db: AsyncSession = Depends(get_db),
+async def _get_github_token(
+    user: User = Depends(require_current_user),
 ) -> str:
-    """현재 사용자의 GitHub 토큰 가져오기"""
-    if not session_id or session_id not in sessions:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="로그인이 필요합니다"
-        )
-
-    user_id = sessions[session_id]
-    service = GitHubService(db)
-    user = await service.get_user_by_id(user_id)
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="사용자를 찾을 수 없습니다"
-        )
-
-    return user.github_access_token
+    """현재 사용자의 GitHub 토큰 가져오기 (JWT 인증 + 복호화)"""
+    return decrypt_token(user.github_access_token)
 
 
 @router.get("/repos", response_model=RepoListResponse)
 async def get_repos(
     per_page: int = Query(default=30, ge=1, le=100),
     page: int = Query(default=1, ge=1),
-    access_token: str = Depends(get_current_user_token),
+    access_token: str = Depends(_get_github_token),
 ):
     """사용자의 GitHub 리포지토리 목록 조회"""
     api = GitHubAPIService(access_token)
@@ -67,7 +51,7 @@ async def get_repo_tree(
     owner: str,
     repo: str,
     branch: str = Query(default="main"),
-    access_token: str = Depends(get_current_user_token),
+    access_token: str = Depends(_get_github_token),
 ):
     """리포지토리 전체 파일 트리 조회"""
     api = GitHubAPIService(access_token)
@@ -94,7 +78,7 @@ async def get_repo_contents(
     owner: str,
     repo: str,
     path: str = Query(default=""),
-    access_token: str = Depends(get_current_user_token),
+    access_token: str = Depends(_get_github_token),
 ):
     """리포지토리 특정 경로 내용 조회"""
     api = GitHubAPIService(access_token)

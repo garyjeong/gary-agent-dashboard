@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 TELEGRAM_API_URL = "https://api.telegram.org"
+HTTP_TIMEOUT = 15.0
 
 # 기본 템플릿
 DEFAULT_TEMPLATE = """🎉 *작업 완료 알림*
@@ -25,6 +26,15 @@ DEFAULT_TEMPLATE = """🎉 *작업 완료 알림*
 📝 *결과*:
 {{result}}
 """
+
+
+def escape_markdown(text: str) -> str:
+    """Markdown 포맷 깨짐을 방지하기 위해 특수문자를 이스케이프"""
+    if not text:
+        return ""
+    escape_chars = r"\_*[]()~`>#+-=|{}.!"
+    escaped = "".join(f"\\{ch}" if ch in escape_chars else ch for ch in text)
+    return escaped
 
 
 class TelegramService:
@@ -54,7 +64,7 @@ class TelegramService:
         url = f"{TELEGRAM_API_URL}/bot{self.bot_token}/sendMessage"
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
                 response = await client.post(
                     url,
                     json={
@@ -144,11 +154,11 @@ class TelegramService:
     ) -> str:
         """템플릿 렌더링"""
         text = template
-        text = text.replace("{{issue_title}}", issue_title or "제목 없음")
-        text = text.replace("{{repo_name}}", repo_name or "미지정")
-        text = text.replace("{{status}}", status)
-        text = text.replace("{{completed_at}}", completed_at)
-        text = text.replace("{{result}}", result or "결과 없음")
+        text = text.replace("{{issue_title}}", escape_markdown(issue_title or "제목 없음"))
+        text = text.replace("{{repo_name}}", escape_markdown(repo_name or "미지정"))
+        text = text.replace("{{status}}", escape_markdown(status))
+        text = text.replace("{{completed_at}}", escape_markdown(completed_at))
+        text = text.replace("{{result}}", escape_markdown(result or "결과 없음"))
         return text
 
     async def send_completion_notification(self, queue_item: QueueItem) -> bool:

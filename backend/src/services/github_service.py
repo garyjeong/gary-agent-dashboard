@@ -1,11 +1,13 @@
 """GitHub OAuth 및 API 서비스"""
 from typing import Optional, List
 import httpx
+import re
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
+from src.crypto import encrypt_token
 from src.models.user import User
 
 settings = get_settings()
@@ -13,6 +15,7 @@ settings = get_settings()
 GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize"
 GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
 GITHUB_API_URL = "https://api.github.com"
+HTTP_TIMEOUT = 20.0
 
 
 class GitHubService:
@@ -33,7 +36,7 @@ class GitHubService:
 
     async def exchange_code_for_token(self, code: str) -> str:
         """인증 코드를 액세스 토큰으로 교환"""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             response = await client.post(
                 GITHUB_TOKEN_URL,
                 data={
@@ -63,7 +66,7 @@ class GitHubService:
 
     async def get_github_user(self, access_token: str) -> dict:
         """GitHub 사용자 정보 조회"""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             response = await client.get(
                 f"{GITHUB_API_URL}/user",
                 headers={
@@ -90,9 +93,11 @@ class GitHubService:
         )
         user = result.scalar_one_or_none()
 
+        encrypted = encrypt_token(access_token)
+
         if user:
             # 토큰 및 정보 업데이트
-            user.github_access_token = access_token
+            user.github_access_token = encrypted
             user.github_login = github_user["login"]
             user.github_name = github_user.get("name")
             user.github_avatar_url = github_user.get("avatar_url")
@@ -103,7 +108,7 @@ class GitHubService:
                 github_login=github_user["login"],
                 github_name=github_user.get("name"),
                 github_avatar_url=github_user.get("avatar_url"),
-                github_access_token=access_token,
+                github_access_token=encrypted,
             )
             self.db.add(user)
 
@@ -131,7 +136,7 @@ class GitHubAPIService:
 
     async def get_repos(self, per_page: int = 30, page: int = 1) -> List[dict]:
         """사용자 리포지토리 목록 조회"""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             response = await client.get(
                 f"{GITHUB_API_URL}/user/repos",
                 headers=self.headers,
@@ -153,7 +158,10 @@ class GitHubAPIService:
 
     async def get_repo_structure(self, owner: str, repo: str, path: str = "") -> List[dict]:
         """리포지토리 디렉토리 구조 조회"""
-        async with httpx.AsyncClient() as client:
+        self._validate_owner_repo(owner, repo)
+        self._validate_path(path)
+
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/contents/{path}"
             response = await client.get(url, headers=self.headers)
 
@@ -173,7 +181,9 @@ class GitHubAPIService:
 
     async def get_repo_tree(self, owner: str, repo: str, branch: str = "main") -> dict:
         """리포지토리 전체 트리 조회"""
-        async with httpx.AsyncClient() as client:
+        self._validate_owner_repo(owner, repo)
+
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/git/trees/{branch}?recursive=1"
             response = await client.get(url, headers=self.headers)
 
@@ -187,3 +197,20 @@ class GitHubAPIService:
                 )
 
             return response.json()
+
+    def _validate_owner_repo(self, owner: str, repo: str) -> None:
+        """owner/repo 입력값 검증"""
+        pattern = r"^[A-Za-z0-9_.-]+$"
+        if not re.match(pattern, owner) or not re.match(pattern, repo):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="잘못된 리포지토리 식별자입니다",
+            )
+
+    def _validate_path(self, path: str) -> None:
+        """경로 입력값 검증"""
+        if ".." in path or path.startswith("/"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="허용되지 않는 경로입니다",
+            )

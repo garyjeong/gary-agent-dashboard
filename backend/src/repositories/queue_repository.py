@@ -31,13 +31,18 @@ class QueueRepository:
         return result.scalar_one_or_none()
 
     async def get_next_pending(self) -> Optional[QueueItem]:
-        """다음 처리할 큐 아이템 조회 (우선순위 높은 순, 생성 순)"""
+        """다음 처리할 큐 아이템 조회 (우선순위 높은 순, 생성 순)
+
+        with_for_update(skip_locked=True)를 사용해 다중 워커 동시 처리 시 중복 할당을 방지한다.
+        SQLite에서는 무시되지만 Postgres 등에서는 잠금을 건다.
+        """
         result = await self.db.execute(
             select(QueueItem)
             .options(selectinload(QueueItem.issue))
             .where(QueueItem.status == QueueStatus.PENDING)
             .order_by(QueueItem.priority.desc(), QueueItem.created_at.asc())
             .limit(1)
+            .with_for_update(skip_locked=True)
         )
         return result.scalar_one_or_none()
 
