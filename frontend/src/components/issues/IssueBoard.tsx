@@ -16,6 +16,7 @@ import { useIssues } from '@/hooks';
 import { IssueColumn } from './IssueColumn';
 import { IssueCard } from './IssueCard';
 import { IssueModal } from './IssueModal';
+import { IssueDetailModal } from './IssueDetailModal';
 import { issueService } from '@/services/issueService';
 import type { Issue, IssueStatus, IssueCreate, IssueUpdate } from '@/types';
 
@@ -35,6 +36,7 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIssue, setEditingIssue] = useState<Issue | null>(null);
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+  const [viewingIssue, setViewingIssue] = useState<Issue | null>(null);
 
   // 드래그 센서: 포인터(마우스) + 터치
   const sensors = useSensors(
@@ -156,6 +158,7 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
               title={column.title}
               status={column.status}
               issues={issues.filter((issue) => issue.status === column.status)}
+              onView={setViewingIssue}
               onEdit={setEditingIssue}
               onDelete={handleDelete}
               onWorkRequest={handleWorkRequest}
@@ -194,6 +197,18 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
           issue={editingIssue}
           onClose={() => setEditingIssue(null)}
           onSubmit={(data) => handleUpdate(editingIssue.id, data)}
+        />
+      )}
+
+      {/* 상세 보기 모달 */}
+      {viewingIssue && (
+        <IssueDetailModal
+          issue={viewingIssue}
+          onClose={() => setViewingIssue(null)}
+          onEdit={() => {
+            setViewingIssue(null);
+            setEditingIssue(viewingIssue);
+          }}
         />
       )}
     </>

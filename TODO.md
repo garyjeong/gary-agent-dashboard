@@ -81,11 +81,11 @@
 - **파일**: `backend/src/models/label.py`, `backend/src/routes/labels.py`, `frontend/src/hooks/useLabels.ts`
 
 ### 3.3 일감 상세 모달 개선
-- [ ] 에이전트 작업 이력 타임라인 표시
-- [ ] 마크다운 설명 렌더링 (react-markdown)
+- [x] 에이전트 작업 이력 타임라인 표시
+- [x] 마크다운 설명 렌더링 (react-markdown)
 - [ ] 동작 예시 편집 (인라인 에디터)
 - [ ] GitHub PR 링크 표시 (있는 경우)
-- [ ] 모달 크기 확대 (더 많은 정보)
+- [x] 모달 크기 확대 (더 많은 정보)
 - **파일**: `frontend/src/components/issues/IssueDetailModal.tsx` (신규)
 
 ### 3.4 리포지토리별 필터링

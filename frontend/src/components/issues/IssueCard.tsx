@@ -10,6 +10,7 @@ import { formatRelativeTime } from '@/lib/timeUtils';
 
 interface IssueCardProps {
   issue: Issue;
+  onView?: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onWorkRequest: () => void;
@@ -30,6 +31,7 @@ const priorityLabels = {
 
 export function IssueCard({
   issue,
+  onView,
   onEdit,
   onDelete,
   onWorkRequest,
@@ -88,7 +90,10 @@ export function IssueCard({
           >
             <GripVertical className="w-3.5 h-3.5" />
           </button>
-          <h4 className="text-sm font-medium text-gray-900 leading-snug flex-1">
+          <h4
+            className="text-sm font-medium text-gray-900 leading-snug flex-1 cursor-pointer hover:text-primary-600 transition-colors"
+            onClick={onView}
+          >
             {issue.title}
           </h4>
 

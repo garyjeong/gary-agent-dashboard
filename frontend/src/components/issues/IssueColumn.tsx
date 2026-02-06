@@ -10,6 +10,7 @@ interface IssueColumnProps {
   title: string;
   status: IssueStatus;
   issues: Issue[];
+  onView: (issue: Issue) => void;
   onEdit: (issue: Issue) => void;
   onDelete: (id: number) => void;
   onWorkRequest: (id: number) => void;
@@ -26,6 +27,7 @@ export function IssueColumn({
   title,
   status,
   issues,
+  onView,
   onEdit,
   onDelete,
   onWorkRequest,
@@ -62,6 +64,7 @@ export function IssueColumn({
             <IssueCard
               key={issue.id}
               issue={issue}
+              onView={() => onView(issue)}
               onEdit={() => onEdit(issue)}
               onDelete={() => onDelete(issue.id)}
               onWorkRequest={() => onWorkRequest(issue.id)}

@@ -1,10 +1,12 @@
 """일감 라우터"""
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
 from src.models.issue import IssueStatus, IssuePriority
+from src.models.queue_item import QueueItem
 from src.repositories.issue_repository import IssueRepository
 from src.repositories.queue_repository import QueueRepository
 from src.services.issue_service import IssueService
@@ -84,6 +86,20 @@ async def delete_issue(
 ):
     """일감 삭제"""
     await service.delete_issue(issue_id)
+
+
+@router.get("/{issue_id}/queue-items", response_model=List[QueueItemResponse])
+async def get_issue_queue_items(
+    issue_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """일감의 작업 이력 조회"""
+    result = await db.execute(
+        select(QueueItem)
+        .where(QueueItem.issue_id == issue_id)
+        .order_by(QueueItem.created_at.desc())
+    )
+    return list(result.scalars().all())
 
 
 @router.post("/{issue_id}/work-request", response_model=QueueItemResponse, status_code=201)
