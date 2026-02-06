@@ -21,6 +21,7 @@ export interface Issue {
   pr_url: string | null;
   behavior_example: string | null;
   labels: Label[];
+  latest_queue_status: string | null;
   created_at: string;
   updated_at: string;
 }

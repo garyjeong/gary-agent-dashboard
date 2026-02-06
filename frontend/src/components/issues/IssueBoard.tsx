@@ -191,9 +191,35 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-primary-600" />
-      </div>
+      <>
+        {/* 스켈레톤 통계 헤더 */}
+        <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-100">
+          <div className="h-4 w-20 bg-gray-100 rounded animate-pulse" />
+          <div className="h-4 w-32 bg-gray-100 rounded animate-pulse" />
+        </div>
+        {/* 스켈레톤 칸반 보드 */}
+        <div className="flex gap-4 lg:gap-6">
+          {[1, 2, 3].map((col) => (
+            <div key={col} className="flex-1 min-w-[280px] max-w-[360px]">
+              <div className="flex items-center gap-2 px-1 py-2 mb-2">
+                <div className="w-2 h-2 rounded-full bg-gray-200 animate-pulse" />
+                <div className="h-4 w-20 bg-gray-100 rounded animate-pulse" />
+              </div>
+              {[1, 2, 3].map((card) => (
+                <div key={card} className="bg-white rounded-md border border-gray-200 p-4 mb-2 space-y-3">
+                  <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
+                  <div className="h-4 w-full bg-gray-100 rounded animate-pulse" />
+                  <div className="h-3 w-3/4 bg-gray-50 rounded animate-pulse" />
+                  <div className="flex justify-between items-center">
+                    <div className="h-5 w-12 bg-gray-100 rounded-full animate-pulse" />
+                    <div className="h-3 w-16 bg-gray-50 rounded animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </>
     );
   }
 

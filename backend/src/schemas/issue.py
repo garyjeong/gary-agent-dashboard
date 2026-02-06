@@ -85,6 +85,7 @@ class IssueResponse(IssueBase):
     """일감 응답 스키마"""
     id: int
     labels: List[LabelResponse] = []
+    latest_queue_status: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

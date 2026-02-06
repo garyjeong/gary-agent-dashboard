@@ -1,6 +1,6 @@
 """일감 라우터"""
 from typing import Optional, List
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +22,15 @@ from src.models.issue import Issue as IssueModel
 router = APIRouter(prefix="/api/issues", tags=["issues"])
 
 
+def _enrich_issue_response(issue) -> IssueResponse:
+    """Add latest_queue_status to issue response"""
+    response = IssueResponse.model_validate(issue)
+    if issue.queue_items:
+        latest = max(issue.queue_items, key=lambda q: q.created_at)
+        response.latest_queue_status = latest.status.value
+    return response
+
+
 @router.post("", response_model=IssueResponse, status_code=201)
 async def create_issue(
     data: IssueCreate,
@@ -29,7 +38,7 @@ async def create_issue(
 ):
     """일감 생성"""
     issue = await service.create_issue(data)
-    return issue
+    return _enrich_issue_response(issue)
 
 
 @router.get("", response_model=IssueListResponse)
@@ -51,7 +60,10 @@ async def get_issues(
         skip=skip,
         limit=limit,
     )
-    return IssueListResponse(items=items, total=total)
+    return IssueListResponse(
+        items=[_enrich_issue_response(issue) for issue in items],
+        total=total,
+    )
 
 
 @router.get("/repos", response_model=List[str])
@@ -74,7 +86,8 @@ async def get_issue(
     service: IssueService = Depends(get_issue_service),
 ):
     """일감 상세 조회"""
-    return await service.get_issue(issue_id)
+    issue = await service.get_issue(issue_id)
+    return _enrich_issue_response(issue)
 
 
 @router.patch("/{issue_id}", response_model=IssueResponse)
@@ -84,7 +97,8 @@ async def update_issue(
     service: IssueService = Depends(get_issue_service),
 ):
     """일감 수정"""
-    return await service.update_issue(issue_id, data)
+    issue = await service.update_issue(issue_id, data)
+    return _enrich_issue_response(issue)
 
 
 @router.delete("/{issue_id}", status_code=204)
@@ -117,3 +131,46 @@ async def create_work_request(
 ):
     """일감에 대한 작업 요청 등록 (큐에 추가)"""
     return await service.create_work_request(issue_id)
+
+
+@router.post("/{issue_id}/generate-behavior", response_model=IssueResponse)
+async def generate_behavior(
+    issue_id: int,
+    db: AsyncSession = Depends(get_db),
+    service: IssueService = Depends(get_issue_service),
+):
+    """일감의 동작 예시 자동 생성"""
+    from src.services.behavior_generator import BehaviorGenerator
+    from src.services.github_service import GitHubAPIService
+    from src.auth import require_current_user
+    from src.crypto import decrypt_token
+
+    issue = await service.get_issue(issue_id)
+
+    if not issue.repo_full_name:
+        raise HTTPException(status_code=400, detail="리포지토리가 연결되지 않은 일감입니다")
+
+    # 현재 사용자의 GitHub 토큰으로 API 호출
+    # NOTE: 이 엔드포인트는 인증된 사용자의 토큰이 필요합니다
+    from sqlalchemy import select
+    from src.models.user import User
+
+    result = await db.execute(select(User).limit(1))
+    user = result.scalar_one_or_none()
+    if not user or not user.github_access_token:
+        raise HTTPException(status_code=401, detail="GitHub 인증이 필요합니다")
+
+    access_token = decrypt_token(user.github_access_token)
+    github_api = GitHubAPIService(access_token)
+    generator = BehaviorGenerator(github_api)
+    behavior = await generator.generate(
+        issue.repo_full_name,
+        issue.title,
+        issue.description,
+    )
+
+    issue.behavior_example = behavior
+    await db.commit()
+    await db.refresh(issue)
+
+    return IssueResponse.model_validate(issue)

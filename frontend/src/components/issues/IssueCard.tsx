@@ -170,6 +170,26 @@ export function IssueCard({
           </div>
         )}
 
+        {/* 큐 상태 배지 */}
+        {issue.latest_queue_status && (
+          <div className="mt-2">
+            <Badge
+              variant={
+                issue.latest_queue_status === 'completed' ? 'success'
+                : issue.latest_queue_status === 'in_progress' ? 'info'
+                : issue.latest_queue_status === 'failed' ? 'danger'
+                : 'default'
+              }
+              size="sm"
+            >
+              {issue.latest_queue_status === 'pending' ? '대기 중'
+                : issue.latest_queue_status === 'in_progress' ? '작업 중'
+                : issue.latest_queue_status === 'completed' ? '완료'
+                : '실패'}
+            </Badge>
+          </div>
+        )}
+
         {/* 하단: 우선순위 + 시간 */}
         <div className="flex items-center justify-between mt-3">
           <Badge

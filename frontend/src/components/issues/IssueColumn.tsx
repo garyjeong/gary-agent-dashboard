@@ -55,9 +55,12 @@ export function IssueColumn({
         )}
       >
         {issues.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-            <Inbox className="w-8 h-8 mb-2 opacity-50" />
-            <p className="text-xs">일감이 없습니다</p>
+          <div className="flex flex-col items-center justify-center py-16 text-gray-300">
+            <div className="w-16 h-16 mb-3 rounded-full bg-gray-50 flex items-center justify-center">
+              <Inbox className="w-7 h-7 text-gray-300" />
+            </div>
+            <p className="text-xs font-medium text-gray-400 mb-0.5">일감이 없습니다</p>
+            <p className="text-2xs text-gray-300">드래그하여 일감을 이동하세요</p>
           </div>
         ) : (
           issues.map((issue) => (

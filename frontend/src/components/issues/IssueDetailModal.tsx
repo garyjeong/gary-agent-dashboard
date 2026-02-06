@@ -5,7 +5,8 @@ import { X, GitBranch, ExternalLink, Clock, CheckCircle, XCircle, Loader2, Alert
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { clsx } from 'clsx';
-import { Badge, Button } from '@/components/ui';
+import { Badge, Button, useToast } from '@/components/ui';
+import { issueService } from '@/services/issueService';
 import { formatRelativeTime } from '@/lib/timeUtils';
 import type { Issue, QueueItem } from '@/types';
 
@@ -28,6 +29,20 @@ const queueStatusConfig: Record<string, { icon: typeof CheckCircle; color: strin
 export function IssueDetailModal({ issue, onClose, onEdit }: IssueDetailModalProps) {
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [editingBehavior, setEditingBehavior] = useState(false);
+  const [behaviorDraft, setBehaviorDraft] = useState(issue.behavior_example || '');
+  const toast = useToast();
+
+  const handleSaveBehavior = async () => {
+    try {
+      await issueService.update(issue.id, { behavior_example: behaviorDraft });
+      issue.behavior_example = behaviorDraft;
+      setEditingBehavior(false);
+      toast.success('동작 예시가 저장되었습니다.');
+    } catch {
+      toast.error('동작 예시 저장에 실패했습니다.');
+    }
+  };
 
   useEffect(() => {
     fetch(`/api/issues/${issue.id}/queue-items`)
@@ -130,14 +145,39 @@ export function IssueDetailModal({ issue, onClose, onEdit }: IssueDetailModalPro
           </div>
 
           {/* 동작 예시 */}
-          {issue.behavior_example && (
-            <div className="px-6 pb-4">
-              <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">작업 지침</h4>
-              <pre className="bg-gray-50 rounded-md p-3 text-xs text-gray-700 font-mono whitespace-pre-wrap overflow-x-auto border border-gray-100">
-                {issue.behavior_example}
-              </pre>
+          <div className="px-6 pb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">동작 예시</h4>
+              {!editingBehavior && (
+                <button onClick={() => setEditingBehavior(true)} className="text-xs text-primary-600 hover:text-primary-700">
+                  수정
+                </button>
+              )}
             </div>
-          )}
+            {editingBehavior ? (
+              <div className="space-y-2">
+                <textarea
+                  value={behaviorDraft}
+                  onChange={(e) => setBehaviorDraft(e.target.value)}
+                  rows={6}
+                  className="w-full text-sm text-gray-700 border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 resize-none"
+                  placeholder="에이전트에게 전달할 동작 예시를 입력하세요..."
+                />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => { setEditingBehavior(false); setBehaviorDraft(issue.behavior_example || ''); }} className="text-xs px-3 py-1 text-gray-600 hover:text-gray-800">
+                    취소
+                  </button>
+                  <button onClick={handleSaveBehavior} className="text-xs px-3 py-1 bg-primary-600 text-white rounded hover:bg-primary-700">
+                    저장
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                {issue.behavior_example || '동작 예시가 없습니다.'}
+              </p>
+            )}
+          </div>
 
           {/* 작업 이력 타임라인 */}
           <div className="px-6 pb-6">

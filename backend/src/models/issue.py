@@ -58,7 +58,8 @@ class Issue(Base):
     queue_items: Mapped[List["QueueItem"]] = relationship(
         "QueueItem",
         back_populates="issue",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
     labels: Mapped[List["Label"]] = relationship(
         "Label",

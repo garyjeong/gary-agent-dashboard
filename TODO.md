@@ -20,8 +20,8 @@
 - **파일**: `backend/src/schemas/issue.py`, `backend/src/schemas/queue.py`, `backend/src/services/telegram_service.py`
 
 ### 1.3 API 인증 구현
-- [ ] `/api/queue/*` 엔드포인트에 API Key 인증 추가
-- [ ] `X-API-Key` 헤더 검증 미들웨어 구현
+- [x] `/api/queue/*` 엔드포인트에 API Key 인증 추가
+- [x] `X-API-Key` 헤더 검증 미들웨어 구현
 - **파일**: `backend/src/routes/queue.py:19-32`
 
 ### 1.4 GitHub 토큰 암호화
@@ -38,23 +38,23 @@
 ## 2. 디자인 개선 (HIGH Priority)
 
 ### 2.1 UI 스타일 리뉴얼
-- [ ] Linear/Notion 스타일 적용 (기능 중심, 깔끔한 여백)
-- [ ] 라이트 모드 전용 디자인
-- [ ] 반응형 레이아웃 (모바일 완전 지원)
-- [ ] 컬러 팔레트 정의 (primary, secondary, accent)
-- [ ] 타이포그래피 체계화 (heading, body, caption)
+- [x] Linear/Notion 스타일 적용 (기능 중심, 깔끔한 여백)
+- [x] 라이트 모드 전용 디자인
+- [x] 반응형 레이아웃 (모바일 완전 지원)
+- [x] 컬러 팔레트 정의 (primary, secondary, accent)
+- [x] 타이포그래피 체계화 (heading, body, caption)
 
 ### 2.2 일감 카드 리디자인
 - [x] 리포지토리 이름 표시 (아이콘 + 텍스트)
 - [x] 생성일/수정일 표시 (상대 시간: "2시간 전")
-- [ ] 대기 중인 큐 상태 배지 표시
+- [x] 대기 중인 큐 상태 배지 표시
 - [x] 우선순위 컬러 인디케이터
 - [x] 라벨/태그 표시 영역
 
 ### 2.3 대시보드 개선
 - [x] 리포지토리별 상태별 일감 수 통계 카드
 - [x] 컴팩트한 통계 요약 헤더
-- [ ] 빈 상태 일러스트레이션
+- [x] 빈 상태 일러스트레이션
 
 ### 2.4 컴포넌트 라이브러리
 - [x] Button, Input, Select, Modal 등 기본 컴포넌트 통일
@@ -83,8 +83,8 @@
 ### 3.3 일감 상세 모달 개선
 - [x] 에이전트 작업 이력 타임라인 표시
 - [x] 마크다운 설명 렌더링 (react-markdown)
-- [ ] 동작 예시 편집 (인라인 에디터)
-- [ ] GitHub PR 링크 표시 (있는 경우)
+- [x] 동작 예시 편집 (인라인 에디터)
+- [x] GitHub PR 링크 표시 (있는 경우)
 - [x] 모달 크기 확대 (더 많은 정보)
 - **파일**: `frontend/src/components/issues/IssueDetailModal.tsx` (신규)
 
@@ -134,8 +134,8 @@
 - **파일**: `backend/src/routes/queue.py`
 
 ### 5.4 동작 예시 자동 생성
-- [ ] `BehaviorGenerator` 서비스 구현
-- [ ] 리포 구조 분석 후 행동 지침 생성
+- [x] `BehaviorGenerator` 서비스 구현
+- [x] 리포 구조 분석 후 행동 지침 생성
 - **파일**: `backend/src/services/behavior_generator.py` (신규)
 
 ### 5.5 GitHub PR 연동
@@ -151,7 +151,7 @@
 ### 6.1 로딩 상태
 - [x] 상태 변경 시 로딩 인디케이터
 - [x] 버튼 disabled 상태 표시
-- [ ] 스켈레톤 로딩 UI
+- [x] 스켈레톤 로딩 UI
 - **파일**: `frontend/src/components/issues/IssueCard.tsx`
 
 ### 6.2 Optimistic Update
@@ -180,12 +180,12 @@
 - **파일**: 각 라우터 파일
 
 ### 7.2 프론트엔드 상태 관리
-- [ ] Zustand 도입
-- [ ] 필터 상태 전역화
+- [x] Zustand 도입
+- [x] 필터 상태 전역화
 - **파일**: `frontend/src/lib/store.ts` (신규)
 
 ### 7.3 컴포넌트 분리
-- [ ] `IssueModal` → `CreateIssueModal` + `EditIssueModal` 분리
+- [x] `IssueModal` → `CreateIssueModal` + `EditIssueModal` 분리
 - **파일**: `frontend/src/components/issues/IssueModal.tsx`
 
 ### 7.4 트랜잭션 관리

@@ -22,6 +22,15 @@ body {
   * {
     border-color: var(--border);
   }
+
+  /* 타이포그래피 체계 (heading, body, caption) */
+  h1 { @apply text-2xl font-bold text-gray-900 tracking-tight; }
+  h2 { @apply text-xl font-semibold text-gray-900 tracking-tight; }
+  h3 { @apply text-base font-semibold text-gray-800; }
+  h4 { @apply text-sm font-medium text-gray-800; }
+  .text-body { @apply text-sm text-gray-700 leading-relaxed; }
+  .text-caption { @apply text-xs text-gray-500 leading-normal; }
+  .text-overline { @apply text-2xs font-semibold uppercase tracking-wider text-gray-400; }
 }
 
 @layer utilities {
