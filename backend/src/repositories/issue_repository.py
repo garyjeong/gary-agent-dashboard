@@ -31,23 +31,31 @@ class IssueRepository:
         status: Optional[IssueStatus] = None,
         priority: Optional[IssuePriority] = None,
         repo_full_name: Optional[str] = None,
+        search: Optional[str] = None,
         skip: int = 0,
         limit: int = 50,
     ) -> Tuple[List[Issue], int]:
-        """일감 목록 조회 (필터링, 페이징)"""
+        """일감 목록 조회 (필터링, 검색, 페이징)"""
         query = select(Issue)
         count_query = select(func.count(Issue.id))
 
-        # 필터 적용
+        # 필터 조건 빌드
+        conditions = []
         if status:
-            query = query.where(Issue.status == status)
-            count_query = count_query.where(Issue.status == status)
+            conditions.append(Issue.status == status)
         if priority:
-            query = query.where(Issue.priority == priority)
-            count_query = count_query.where(Issue.priority == priority)
+            conditions.append(Issue.priority == priority)
         if repo_full_name:
-            query = query.where(Issue.repo_full_name == repo_full_name)
-            count_query = count_query.where(Issue.repo_full_name == repo_full_name)
+            conditions.append(Issue.repo_full_name == repo_full_name)
+        if search:
+            search_pattern = f"%{search}%"
+            conditions.append(
+                Issue.title.ilike(search_pattern) | Issue.description.ilike(search_pattern)
+            )
+
+        for cond in conditions:
+            query = query.where(cond)
+            count_query = count_query.where(cond)
 
         # 정렬 및 페이징
         query = query.order_by(Issue.created_at.desc()).offset(skip).limit(limit)

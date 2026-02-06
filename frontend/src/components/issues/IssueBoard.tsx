@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   DndContext,
@@ -14,7 +14,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import useSWR from 'swr';
-import { GitBranch } from 'lucide-react';
+import { GitBranch, Search } from 'lucide-react';
 import { useIssues } from '@/hooks';
 import { fetcher } from '@/lib/fetcher';
 import { IssueColumn } from './IssueColumn';
@@ -40,10 +40,30 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
   const searchParams = useSearchParams();
   const router = useRouter();
   const repoFilter = searchParams.get('repo') || undefined;
+  const searchQuery = searchParams.get('q') || '';
+  const [searchInput, setSearchInput] = useState(searchQuery);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const toast = useToast();
   const { data: repos } = useSWR<string[]>('/api/issues/repos', fetcher);
-  const { issues, isLoading, mutate } = useIssues({ repo_full_name: repoFilter });
+  const { issues, isLoading, mutate } = useIssues({
+    repo_full_name: repoFilter,
+    search: searchQuery || undefined,
+  });
+
+  useEffect(() => {
+    debounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (searchInput) {
+        params.set('q', searchInput);
+      } else {
+        params.delete('q');
+      }
+      const query = params.toString();
+      router.replace(query ? `?${query}` : '/');
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [searchInput]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIssue, setEditingIssue] = useState<Issue | null>(null);
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
@@ -191,7 +211,18 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
           </div>
         </div>
 
-        {/* 리포지토리 필터 */}
+        {/* 검색 + 리포 필터 */}
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="검색..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-7 pr-3 py-1 text-xs text-gray-600 bg-white border border-gray-200 rounded-md w-40 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
         {repos && repos.length > 0 && (
           <div className="flex items-center gap-1.5">
             <GitBranch className="w-3.5 h-3.5 text-gray-400" />
@@ -209,6 +240,7 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
             </select>
           </div>
         )}
+        </div>
       </div>
 
       {/* 칸반 보드 (DnD) */}

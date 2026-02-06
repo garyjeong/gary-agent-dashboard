@@ -54,6 +54,7 @@ class IssueService:
         status_filter: Optional[IssueStatus] = None,
         priority: Optional[IssuePriority] = None,
         repo_full_name: Optional[str] = None,
+        search: Optional[str] = None,
         skip: int = 0,
         limit: int = 50,
     ) -> Tuple[List[Issue], int]:
@@ -62,6 +63,7 @@ class IssueService:
             status=status_filter,
             priority=priority,
             repo_full_name=repo_full_name,
+            search=search,
             skip=skip,
             limit=limit,
         )

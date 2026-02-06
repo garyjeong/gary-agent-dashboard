@@ -46,15 +46,17 @@ async def get_issues(
     status: Optional[IssueStatus] = None,
     priority: Optional[IssuePriority] = None,
     repo: Optional[str] = Query(None, alias="repo_full_name"),
+    search: Optional[str] = Query(None, min_length=1, max_length=200),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     service: IssueService = Depends(get_issue_service),
 ):
-    """일감 목록 조회"""
+    """일감 목록 조회 (필터링 + 검색)"""
     items, total = await service.get_issues(
         status_filter=status,
         priority=priority,
         repo_full_name=repo,
+        search=search,
         skip=skip,
         limit=limit,
     )

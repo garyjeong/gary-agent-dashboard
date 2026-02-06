@@ -10,6 +10,7 @@ interface UseIssuesParams {
   status?: IssueStatus;
   priority?: IssuePriority;
   repo_full_name?: string;
+  search?: string;
 }
 
 export function useIssues(params?: UseIssuesParams) {
@@ -17,6 +18,7 @@ export function useIssues(params?: UseIssuesParams) {
   if (params?.status) searchParams.set('status', params.status);
   if (params?.priority) searchParams.set('priority', params.priority);
   if (params?.repo_full_name) searchParams.set('repo_full_name', params.repo_full_name);
+  if (params?.search) searchParams.set('search', params.search);
   
   const query = searchParams.toString();
   const url = query ? `/api/issues?${query}` : '/api/issues';

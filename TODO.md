@@ -119,13 +119,13 @@
 ## 5. 기능 구현 (MEDIUM Priority)
 
 ### 5.1 페이지네이션 UI
-- [ ] 페이지 컨트롤 컴포넌트 구현
-- [ ] URL 쿼리 파라미터로 페이지 상태 유지
+- [x] 페이지 컨트롤 컴포넌트 구현
+- [x] URL 쿼리 파라미터로 페이지 상태 유지
 - **파일**: `frontend/src/components/issues/IssueBoard.tsx`
 
 ### 5.2 검색 기능
-- [ ] 백엔드: `search` 파라미터 추가 (제목/설명 검색)
-- [ ] 프론트엔드: 검색 입력 컴포넌트 (디바운스 적용)
+- [x] 백엔드: `search` 파라미터 추가 (제목/설명 검색)
+- [x] 프론트엔드: 검색 입력 컴포넌트 (디바운스 적용)
 - **파일**: `backend/src/routes/issues.py`, `backend/src/repositories/issue_repository.py`
 
 ### 5.3 큐 통계 API
