@@ -21,6 +21,7 @@ import { IssueColumn } from './IssueColumn';
 import { IssueCard } from './IssueCard';
 import { IssueModal } from './IssueModal';
 import { IssueDetailModal } from './IssueDetailModal';
+import { useToast } from '@/components/ui';
 import { issueService } from '@/services/issueService';
 import type { Issue, IssueStatus, IssueCreate, IssueUpdate } from '@/types';
 
@@ -40,6 +41,7 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
   const router = useRouter();
   const repoFilter = searchParams.get('repo') || undefined;
 
+  const toast = useToast();
   const { data: repos } = useSWR<string[]>('/api/issues/repos', fetcher);
   const { issues, isLoading, mutate } = useIssues({ repo_full_name: repoFilter });
   const [modalOpen, setModalOpen] = useState(false);
@@ -70,33 +72,54 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
   };
 
   const handleCreate = async (data: IssueCreate | IssueUpdate) => {
-    await issueService.create(data as IssueCreate);
-    mutate();
-    setModalOpen(false);
+    try {
+      await issueService.create(data as IssueCreate);
+      mutate();
+      setModalOpen(false);
+      toast.success('일감이 생성되었습니다.');
+    } catch {
+      toast.error('일감 생성에 실패했습니다.');
+    }
   };
 
   const handleUpdate = async (id: number, data: IssueCreate | IssueUpdate) => {
-    await issueService.update(id, data as IssueUpdate);
-    mutate();
-    setEditingIssue(null);
+    try {
+      await issueService.update(id, data as IssueUpdate);
+      mutate();
+      setEditingIssue(null);
+      toast.success('일감이 수정되었습니다.');
+    } catch {
+      toast.error('일감 수정에 실패했습니다.');
+    }
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm('정말 삭제하시겠습니까?')) {
+    try {
       await issueService.delete(id);
       mutate();
+      toast.success('일감이 삭제되었습니다.');
+    } catch {
+      toast.error('일감 삭제에 실패했습니다.');
     }
   };
 
   const handleWorkRequest = async (id: number) => {
-    await issueService.createWorkRequest(id);
-    alert('작업 요청이 큐에 등록되었습니다.');
-    mutate();
+    try {
+      await issueService.createWorkRequest(id);
+      toast.success('작업 요청이 큐에 등록되었습니다.');
+      mutate();
+    } catch {
+      toast.error('작업 요청 등록에 실패했습니다.');
+    }
   };
 
   const handleStatusChange = async (issue: Issue, newStatus: IssueStatus) => {
-    await issueService.update(issue.id, { status: newStatus });
-    mutate();
+    try {
+      await issueService.update(issue.id, { status: newStatus });
+      mutate();
+    } catch {
+      toast.error('상태 변경에 실패했습니다.');
+    }
   };
 
   // 드래그 시작
@@ -118,9 +141,12 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
 
     if (!issue || issue.status === newStatus) return;
 
-    // 상태 변경
-    await issueService.update(issueId, { status: newStatus });
-    mutate();
+    try {
+      await issueService.update(issueId, { status: newStatus });
+      mutate();
+    } catch {
+      toast.error('상태 변경에 실패했습니다.');
+    }
   };
 
   // 통계 계산

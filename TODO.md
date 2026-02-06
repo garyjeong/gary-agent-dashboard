@@ -104,9 +104,9 @@
 - **파일**: `backend/src/schemas/error.py`, `backend/src/main.py`, `backend/src/services/github_service.py`
 
 ### 4.2 프론트엔드 에러 표시
-- [ ] Toast 컴포넌트 구현 (성공/에러/경고)
-- [ ] API 호출 실패 시 사용자에게 알림
-- [ ] 네트워크 에러, 타임아웃 처리
+- [x] Toast 컴포넌트 구현 (성공/에러/경고)
+- [x] API 호출 실패 시 사용자에게 알림
+- [x] 네트워크 에러, 타임아웃 처리
 - **파일**: `frontend/src/components/ui/Toast.tsx` (신규)
 
 ### 4.3 타임아웃 및 재시도

@@ -6,3 +6,5 @@ export type { BadgeProps } from './Badge';
 
 export { Card, CardHeader, CardContent } from './Card';
 export type { CardProps, CardHeaderProps, CardContentProps } from './Card';
+
+export { ToastProvider, useToast } from './Toast';
