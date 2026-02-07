@@ -23,6 +23,13 @@ from src.schemas.github import (
     DeepAnalysisSuggestionResponse,
     CreateIssuesFromSuggestionsRequest,
     CreateIssuesFromSuggestionsResponse,
+    BranchResponse,
+    BranchListResponse,
+    CommitResponse,
+    CommitAuthorResponse,
+    CommitStatsResponse,
+    CommitListResponse,
+    CommitAnalysisResponse,
 )
 from src.schemas.issue import IssueResponse
 from src.auth import require_current_user
@@ -167,6 +174,62 @@ async def import_github_issue(
     return IssueResponse.model_validate(new_issue)
 
 
+# ── 브랜치 / 커밋 API ──────────────────────────────────────
+
+@router.get(
+    "/repos/{owner}/{repo}/branches",
+    response_model=BranchListResponse,
+)
+async def get_repo_branches(
+    owner: str,
+    repo: str,
+    access_token: str = Depends(_get_github_token),
+):
+    """리포지토리 브랜치 목록 조회"""
+    api = GitHubAPIService(access_token)
+    branches = await api.get_branches(owner, repo)
+    items = [BranchResponse(**b) for b in branches]
+    return BranchListResponse(items=items)
+
+
+@router.get(
+    "/repos/{owner}/{repo}/commits",
+    response_model=CommitListResponse,
+)
+async def get_repo_commits(
+    owner: str,
+    repo: str,
+    sha: str = Query(default="", description="브랜치 이름 또는 커밋 SHA"),
+    per_page: int = Query(default=30, ge=1, le=100),
+    access_token: str = Depends(_get_github_token),
+):
+    """리포지토리 최근 커밋 목록 조회"""
+    api = GitHubAPIService(access_token)
+    commits = await api.get_commits(owner, repo, sha=sha, per_page=per_page)
+    items = [
+        CommitResponse(
+            sha=c["sha"],
+            message=c["message"],
+            author=CommitAuthorResponse(
+                name=c["author_name"],
+                email=c["author_email"],
+                login=c.get("author_login"),
+                avatar_url=c.get("author_avatar_url"),
+            ),
+            date=c["author_date"],
+            html_url=c["html_url"],
+            stats=CommitStatsResponse(**c["stats"]) if c.get("stats") else None,
+            files_changed=c.get("files_changed"),
+        )
+        for c in commits
+    ]
+    return CommitListResponse(
+        items=items,
+        repo_full_name=f"{owner}/{repo}",
+        branch=sha or None,
+    )
+
+
 # ── 연동 리포지토리 관리 ──────────────────────────────────────
 
 @router.get("/connected-repos", response_model=ConnectedRepoListResponse)
@@ -196,6 +259,7 @@ async def get_connected_repos(
             connected_at=r.connected_at.isoformat(),
             analysis_status=r.analysis_status,
             deep_analysis_status=r.deep_analysis_status,
+            commit_analysis_status=r.commit_analysis_status,
         )
         for r in repos
     ]
@@ -268,6 +332,7 @@ async def connect_repo(
         connected_at=repo.connected_at.isoformat(),
         analysis_status=repo.analysis_status,
         deep_analysis_status=repo.deep_analysis_status,
+        commit_analysis_status=repo.commit_analysis_status,
     )
 
 
@@ -585,3 +650,94 @@ async def create_issues_from_suggestions(
         created_count=len(created_ids),
         issue_ids=created_ids,
     )
+
+
+# ── 커밋 히스토리 AI 분석 (Phase 3) ──────────────────────────
+
+@router.get(
+    "/connected-repos/{repo_id}/commit-analysis",
+    response_model=CommitAnalysisResponse,
+)
+async def get_commit_analysis(
+    repo_id: int,
+    user: User = Depends(require_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """커밋 히스토리 AI 분석 결과 조회"""
+    result = await db.execute(
+        select(ConnectedRepo).where(
+            ConnectedRepo.id == repo_id,
+            ConnectedRepo.user_id == user.id,
+        )
+    )
+    repo = result.scalar_one_or_none()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="연동된 리포지토리를 찾을 수 없습니다",
+        )
+
+    return CommitAnalysisResponse(
+        commit_analysis_status=repo.commit_analysis_status,
+        commit_analysis_result=repo.commit_analysis_result,
+        commit_analysis_error=repo.commit_analysis_error,
+        commit_analyzed_at=(
+            repo.commit_analyzed_at.isoformat() if repo.commit_analyzed_at else None
+        ),
+    )
+
+
+@router.post("/connected-repos/{repo_id}/commit-analysis/trigger")
+async def trigger_commit_analysis(
+    repo_id: int,
+    user: User = Depends(require_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """커밋 히스토리 AI 분석 트리거"""
+    result = await db.execute(
+        select(ConnectedRepo).where(
+            ConnectedRepo.id == repo_id,
+            ConnectedRepo.user_id == user.id,
+        )
+    )
+    repo = result.scalar_one_or_none()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="연동된 리포지토리를 찾을 수 없습니다",
+        )
+    if repo.commit_analysis_status == "analyzing":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 커밋 분석이 진행 중입니다",
+        )
+
+    repo.commit_analysis_status = "pending"
+    repo.commit_analysis_error = None
+    await db.commit()
+
+    github_token = decrypt_token(user.github_repo_token)
+    rid = repo.id
+    owner, repo_name = repo.full_name.split("/", 1)
+    default_branch = repo.default_branch
+
+    async def _run_commit_analysis():
+        async with async_session_maker() as bg_db:
+            try:
+                github_api = GitHubAPIService(github_token)
+                commits = await github_api.get_commits(
+                    owner, repo_name, sha=default_branch, per_page=30
+                )
+                service = GeminiAnalysisService(github_api)
+                await service.analyze_commits(rid, bg_db, commits)
+            except Exception:
+                logger.exception(
+                    "Background commit analysis failed: repo_id=%d", rid
+                )
+
+    asyncio.create_task(_run_commit_analysis())
+
+    return {
+        "message": "커밋 분석이 시작되었습니다",
+        "commit_analysis_status": "pending",
+    }

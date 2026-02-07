@@ -43,6 +43,7 @@ export interface ConnectedRepo {
   connected_at: string;
   analysis_status: 'pending' | 'analyzing' | 'completed' | 'failed' | null;
   deep_analysis_status: 'pending' | 'analyzing' | 'completed' | 'failed' | null;
+  commit_analysis_status: 'pending' | 'analyzing' | 'completed' | 'failed' | null;
 }
 
 export interface ConnectedRepoListResponse {
@@ -84,4 +85,52 @@ export interface DeepAnalysisResponse {
   deep_analysis_error: string | null;
   deep_analyzed_at: string | null;
   suggestions: DeepAnalysisSuggestion[];
+}
+
+/* ── 브랜치 / 커밋 / 커밋 분석 ───────────────────────── */
+
+export interface Branch {
+  name: string;
+  sha: string;
+  protected: boolean;
+}
+
+export interface CommitAuthor {
+  name: string;
+  email: string;
+  login: string | null;
+  avatar_url: string | null;
+}
+
+export interface CommitStats {
+  additions: number;
+  deletions: number;
+  total: number;
+}
+
+export interface Commit {
+  sha: string;
+  message: string;
+  author: CommitAuthor;
+  date: string;
+  html_url: string;
+  stats: CommitStats | null;
+  files_changed: number | null;
+}
+
+export interface CommitListResponse {
+  items: Commit[];
+  repo_full_name: string;
+  branch: string | null;
+}
+
+export interface BranchListResponse {
+  items: Branch[];
+}
+
+export interface CommitAnalysisResponse {
+  commit_analysis_status: 'pending' | 'analyzing' | 'completed' | 'failed' | null;
+  commit_analysis_result: string | null;
+  commit_analysis_error: string | null;
+  commit_analyzed_at: string | null;
 }

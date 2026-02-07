@@ -62,6 +62,61 @@ class GitHubIssueResponse(BaseModel):
     updated_at: str
 
 
+# ── 브랜치 / 커밋 스키마 ──────────────────────────────────────
+
+class BranchResponse(BaseModel):
+    """브랜치 정보"""
+    name: str
+    sha: str
+    protected: bool = False
+
+
+class BranchListResponse(BaseModel):
+    """브랜치 목록 응답"""
+    items: List[BranchResponse]
+
+
+class CommitAuthorResponse(BaseModel):
+    """커밋 작성자"""
+    name: str
+    email: str
+    login: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+class CommitStatsResponse(BaseModel):
+    """커밋 변경 통계"""
+    additions: int = 0
+    deletions: int = 0
+    total: int = 0
+
+
+class CommitResponse(BaseModel):
+    """커밋 정보"""
+    sha: str
+    message: str
+    author: CommitAuthorResponse
+    date: str
+    html_url: str
+    stats: Optional[CommitStatsResponse] = None
+    files_changed: Optional[int] = None
+
+
+class CommitListResponse(BaseModel):
+    """커밋 목록 응답"""
+    items: List[CommitResponse]
+    repo_full_name: str
+    branch: Optional[str] = None
+
+
+class CommitAnalysisResponse(BaseModel):
+    """커밋 히스토리 AI 분석 결과"""
+    commit_analysis_status: Optional[str] = None
+    commit_analysis_result: Optional[str] = None
+    commit_analysis_error: Optional[str] = None
+    commit_analyzed_at: Optional[str] = None
+
+
 class ConnectRepoRequest(BaseModel):
     """리포지토리 연동 요청"""
     github_repo_id: int
@@ -90,6 +145,7 @@ class ConnectedRepoResponse(BaseModel):
     connected_at: str
     analysis_status: Optional[str] = None
     deep_analysis_status: Optional[str] = None
+    commit_analysis_status: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

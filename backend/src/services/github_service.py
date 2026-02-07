@@ -281,6 +281,96 @@ class GitHubAPIService:
             if "pull_request" not in issue
         ]
 
+    async def get_branches(self, owner: str, repo: str) -> List[dict]:
+        """리포지토리 브랜치 목록 전체 조회"""
+        self._validate_owner_repo(owner, repo)
+
+        all_branches: List[dict] = []
+        page = 1
+        per_page = 100
+
+        while True:
+            url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/branches"
+            response = await request_with_retry(
+                "GET", url, headers=self.headers,
+                params={"per_page": per_page, "page": page},
+            )
+
+            if response.status_code == 404:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="리포지토리를 찾을 수 없습니다",
+                )
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail="브랜치 목록 조회 실패",
+                )
+
+            branches = response.json()
+            if not branches:
+                break
+            all_branches.extend(branches)
+            if len(branches) < per_page:
+                break
+            page += 1
+
+        return [
+            {
+                "name": b["name"],
+                "sha": b["commit"]["sha"],
+                "protected": b.get("protected", False),
+            }
+            for b in all_branches
+        ]
+
+    async def get_commits(
+        self, owner: str, repo: str,
+        sha: str = "", per_page: int = 30,
+    ) -> List[dict]:
+        """리포지토리 최근 커밋 목록 조회"""
+        self._validate_owner_repo(owner, repo)
+
+        url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/commits"
+        params: dict = {"per_page": per_page}
+        if sha:
+            params["sha"] = sha
+
+        response = await request_with_retry(
+            "GET", url, headers=self.headers, params=params,
+        )
+
+        if response.status_code == 404:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="리포지토리를 찾을 수 없습니다",
+            )
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail="커밋 목록 조회 실패",
+            )
+
+        return [
+            {
+                "sha": c["sha"],
+                "message": c["commit"]["message"],
+                "author_name": c["commit"]["author"]["name"],
+                "author_email": c["commit"]["author"]["email"],
+                "author_date": c["commit"]["author"]["date"],
+                "author_login": c["author"]["login"] if c.get("author") else None,
+                "author_avatar_url": c["author"]["avatar_url"] if c.get("author") else None,
+                "html_url": c["html_url"],
+                "stats": {
+                    "additions": c["stats"]["additions"],
+                    "deletions": c["stats"]["deletions"],
+                    "total": c["stats"]["total"],
+                } if c.get("stats") else None,
+                "files_changed": len(c.get("files", [])) if c.get("files") else None,
+            }
+            for c in response.json()
+        ]
+
     async def get_single_issue(self, owner: str, repo: str, issue_number: int) -> dict:
         """리포지토리 단일 이슈 조회"""
         self._validate_owner_repo(owner, repo)

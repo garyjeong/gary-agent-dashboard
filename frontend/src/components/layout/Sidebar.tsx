@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutDashboard, ListTodo, Settings, GitBranch, X } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Settings, GitBranch, History, X } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -10,6 +10,7 @@ const navigation = [
   { name: '대시보드', href: '/', icon: LayoutDashboard },
   { name: '일감 목록', href: '/issues', icon: ListTodo },
   { name: 'GitHub 연동', href: '/github', icon: GitBranch },
+  { name: '히스토리', href: '/history', icon: History },
   { name: '설정', href: '/settings', icon: Settings },
 ];
 

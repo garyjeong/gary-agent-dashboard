@@ -1,12 +1,16 @@
 """인증 라우터"""
+import asyncio
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, Cookie, status
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
-from src.database import get_db
-from src.services.github_service import GitHubService
+from src.database import get_db, async_session_maker
+from src.services.github_service import GitHubService, GitHubAPIService
+from src.services.gemini_service import GeminiAnalysisService
 from src.schemas.auth import AuthURLResponse, UserResponse
 from src.auth import (
     create_access_token,
@@ -14,7 +18,11 @@ from src.auth import (
     verify_token,
     get_current_user,
 )
+from src.crypto import decrypt_token
 from src.models.user import User
+from src.models.connected_repo import ConnectedRepo
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 settings = get_settings()
@@ -56,6 +64,44 @@ def _clear_auth_cookies(response: Response) -> None:
     response.delete_cookie("refresh_token")
 
 
+async def _trigger_commit_analysis_on_login(user_id: int, repo_token: str) -> None:
+    """로그인 시 미분석 연동 리포의 커밋 히스토리 분석을 백그라운드로 실행"""
+    async with async_session_maker() as bg_db:
+        try:
+            result = await bg_db.execute(
+                select(ConnectedRepo).where(
+                    ConnectedRepo.user_id == user_id,
+                    ConnectedRepo.commit_analysis_status.is_(None),
+                )
+            )
+            repos = list(result.scalars().all())
+
+            if not repos:
+                return
+
+            github_api = GitHubAPIService(repo_token)
+            gemini_service = GeminiAnalysisService(github_api)
+
+            for repo in repos:
+                try:
+                    owner, repo_name = repo.full_name.split("/", 1)
+                    commits_data = await github_api.get_commits(
+                        owner, repo_name, per_page=30
+                    )
+                    if commits_data:
+                        await gemini_service.analyze_commits(
+                            repo.id, bg_db, commits_data
+                        )
+                except Exception:
+                    logger.exception(
+                        "로그인 커밋 분석 실패: repo=%s", repo.full_name
+                    )
+        except Exception:
+            logger.exception(
+                "로그인 시 커밋 분석 트리거 실패: user_id=%d", user_id
+            )
+
+
 @router.get("/github", response_model=AuthURLResponse)
 async def github_login(
     redirect_uri: str = Query(default="http://localhost:5555/api/auth/github/callback"),
@@ -77,6 +123,13 @@ async def github_callback(
 
     response = RedirectResponse(url="http://localhost:5555", status_code=302)
     _set_auth_cookies(response, user.id)
+
+    # 로그인 시 미분석 리포의 커밋 분석 백그라운드 트리거
+    if user.github_repo_token:
+        user_id = user.id
+        repo_token = decrypt_token(user.github_repo_token)
+        asyncio.create_task(_trigger_commit_analysis_on_login(user_id, repo_token))
+
     return response
 
 
@@ -154,7 +207,6 @@ async def refresh_tokens(
     user_id = int(payload["sub"])
 
     # 사용자 존재 확인
-    from sqlalchemy import select
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:

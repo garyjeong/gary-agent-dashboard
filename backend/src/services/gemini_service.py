@@ -3,7 +3,7 @@ import base64
 import json
 import logging
 import re
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 from sqlalchemy import select, delete
@@ -24,10 +24,9 @@ from src.models.label import Label, issue_labels
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-GEMINI_API_URL = (
-    "https://generativelanguage.googleapis.com/v1beta"
-    "/models/gemini-2.0-flash:generateContent"
-)
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+GEMINI_MODEL_FLASH = "gemini-2.5-flash"
+GEMINI_MODEL_PRO = "gemini-2.5-pro"
 
 # 분석 대상 주요 파일
 KEY_FILES = [
@@ -251,12 +250,14 @@ What is this project? What problem does it solve? (2-3 sentences)
 Keep the analysis concise but comprehensive. Focus on information that would help a developer quickly understand the codebase and start contributing.
 """
 
-    async def _call_gemini(self, prompt: str) -> str:
-        """Gemini API 호출"""
+    async def _call_gemini(
+        self, prompt: str, model: str = GEMINI_MODEL_FLASH
+    ) -> str:
+        """Gemini API 호출 (model: flash 또는 pro)"""
         if not settings.gemini_api_key:
             raise ValueError("GEMINI_API_KEY가 설정되지 않았습니다")
 
-        url = f"{GEMINI_API_URL}?key={settings.gemini_api_key}"
+        url = f"{GEMINI_BASE_URL}/{model}:generateContent?key={settings.gemini_api_key}"
         body = {
             "contents": [{"parts": [{"text": prompt}]}],
         }
@@ -266,7 +267,7 @@ Keep the analysis concise but comprehensive. Focus on information that would hel
             url,
             json=body,
             headers={"Content-Type": "application/json"},
-            timeout=60.0,
+            timeout=120.0,
             max_retries=2,
         )
 
@@ -338,7 +339,7 @@ Keep the analysis concise but comprehensive. Focus on information that would hel
                 repo.full_name, repo.description,
                 repo.analysis_result, files_content,
             )
-            raw_response = await self._call_gemini(prompt)
+            raw_response = await self._call_gemini(prompt, model=GEMINI_MODEL_PRO)
 
             # 응답 파싱
             suggestions_data, markdown_report = self._parse_deep_response(
@@ -591,10 +592,33 @@ Repository: {full_name}
 
     # ── 일감 AI 자동 생성 ──────────────────────────────────
 
+    @staticmethod
+    def _build_repo_analysis_context(repo: ConnectedRepo) -> str:
+        """리포지토리의 기본 분석 + 심층 분석 결과를 프롬프트 컨텍스트로 빌드"""
+        sections = [f"\n## 리포지토리: {repo.full_name}"]
+        if repo.description:
+            sections.append(f"설명: {repo.description}")
+
+        # 기본 분석 결과
+        if repo.analysis_result:
+            analysis_text = repo.analysis_result
+            if len(analysis_text) > 2000:
+                analysis_text = analysis_text[:2000] + "\n... (이하 생략)"
+            sections.append(f"\n### 기본 분석 결과\n{analysis_text}")
+
+        # 심층 분석 결과
+        if repo.deep_analysis_result:
+            deep_text = repo.deep_analysis_result
+            if len(deep_text) > 3000:
+                deep_text = deep_text[:3000] + "\n... (이하 생략)"
+            sections.append(f"\n### 심층 분석 결과\n{deep_text}")
+
+        return "\n".join(sections)
+
     async def generate_work_plan(
         self, issue_id: int, db: AsyncSession
     ) -> None:
-        """일감의 제목, 우선순위, 카테고리, 작업 계획을 AI로 자동 생성"""
+        """일감의 제목, 우선순위, 카테고리, 리포지토리, 작업 계획을 AI로 자동 생성"""
         result = await db.execute(
             select(Issue).where(Issue.id == issue_id)
         )
@@ -613,41 +637,49 @@ Repository: {full_name}
             label_names = [l.name for l in available_labels]
             label_map = {l.name: l.id for l in available_labels}
 
-            # 리포 컨텍스트 수집
-            repo_context = ""
-            if issue.repo_full_name:
-                try:
-                    owner, repo_name = issue.repo_full_name.split("/", 1)
-                    tree_data = await self.github.get_repo_tree(owner, repo_name)
-                    file_paths = [
-                        item["path"]
-                        for item in tree_data.get("tree", [])
-                        if item.get("type") == "blob"
-                    ]
-                    tree_text = "\n".join(file_paths[:300])
-                    if len(file_paths) > 300:
-                        tree_text += f"\n... 외 {len(file_paths) - 300}개 파일"
-                    repo_context = f"""
-## 리포지토리 정보
-- 리포지토리: {issue.repo_full_name}
+            # 연결된 리포지토리 목록 조회 (분석 결과 포함)
+            repo_result = await db.execute(select(ConnectedRepo))
+            connected_repos = list(repo_result.scalars().all())
+            repo_names = [r.full_name for r in connected_repos]
+            repo_map = {r.full_name: r for r in connected_repos}
+            repo_descriptions = []
+            for r in connected_repos:
+                desc = f"- {r.full_name}"
+                if r.description:
+                    desc += f": {r.description}"
+                repo_descriptions.append(desc)
+            repo_list_text = "\n".join(repo_descriptions) if repo_descriptions else "(연결된 리포지토리 없음)"
 
-### 파일 구조
-```
-{tree_text}
-```
-"""
-                except Exception as e:
-                    logger.warning(
-                        "리포 구조 조회 실패: %s — %s", issue.repo_full_name, e
-                    )
+            # 리포 분석 컨텍스트 수집
+            repo_context = ""
+            target_repo_name = issue.repo_full_name
+            if target_repo_name and target_repo_name in repo_map:
+                target_repo = repo_map[target_repo_name]
+                repo_context = self._build_repo_analysis_context(target_repo)
+            elif not target_repo_name and connected_repos:
+                # 리포 미지정 시에도 연결된 리포 분석 결과 요약 제공
+                summaries = []
+                for r in connected_repos:
+                    summary = f"### {r.full_name}"
+                    if r.description:
+                        summary += f"\n{r.description}"
+                    if r.analysis_result:
+                        # 기본 분석 결과 앞부분만
+                        summary += f"\n{r.analysis_result[:500]}"
+                    summaries.append(summary)
+                if summaries:
+                    repo_context = "\n## 연결된 리포지토리 분석 요약\n" + "\n\n".join(summaries)
 
             prompt = f"""당신은 소프트웨어 개발 프로젝트 매니저입니다.
 사용자가 아래 설명을 입력하여 일감(task)을 등록했습니다.
-이 설명을 분석하여 일감의 메타데이터와 상세 작업 계획을 생성해주세요.
+이 설명과 리포지토리 분석 결과를 참고하여 일감의 메타데이터와 구체적인 작업 계획을 생성해주세요.
 
 ## 사용자 입력
 {issue.description or '(설명 없음)'}
 {repo_context}
+
+## 연결된 리포지토리 목록
+{repo_list_text}
 
 ## 생성해야 할 항목
 
@@ -659,20 +691,23 @@ Repository: {full_name}
 {{
   "title": "간결한 일감 제목 (최대 80자, 한국어)",
   "priority": "low|medium|high",
-  "labels": ["사용 가능한 라벨 중 선택"]
+  "labels": ["사용 가능한 라벨 중 선택"],
+  "repo_full_name": "owner/repo 또는 null"
 }}
 ```
 
 - **title**: 설명의 핵심을 담은 간결한 제목
 - **priority**: 작업의 긴급도/복잡도 기반 (high=긴급하거나 복잡, medium=보통, low=간단)
 - **labels**: 다음 라벨 중 해당하는 것을 선택: {json.dumps(label_names, ensure_ascii=False)}
+- **repo_full_name**: 이 일감과 가장 관련 있는 리포지토리를 위 목록에서 선택. 관련 리포가 없으면 null
 
-**그 다음** 마크다운으로 작업 계획을 작성하세요:
+**그 다음** 마크다운으로 작업 계획을 작성하세요.
+리포지토리의 기본 분석/심층 분석 결과가 제공된 경우, 실제 프로젝트 구조와 기술 스택을 반영하여 구체적으로 작성하세요.
 
 ### 작업 계획
-1. 구체적인 단계별 작업 내용
-2. 각 단계에서 수정해야 할 파일이나 모듈 언급
-3. 기술적 고려사항 포함
+1. 구체적인 단계별 작업 내용 (실제 파일 경로와 모듈명 사용)
+2. 기존 코드 구조를 고려한 구현 방법
+3. 기술적 고려사항
 
 ### 예상 동작
 - 구현 완료 후 시스템의 예상 동작
@@ -683,7 +718,7 @@ Repository: {full_name}
 - [ ] 테스트 항목
 
 ### 주의사항
-- 구현 시 주의할 점
+- 구현 시 주의할 점 (기존 코드와의 호환성 등)
 
 **중요**: 모든 텍스트는 한국어로, 구체적이고 실행 가능하게 작성하세요.
 """
@@ -710,6 +745,10 @@ Repository: {full_name}
                     }
                     if priority_val in priority_map:
                         issue.priority = priority_map[priority_val]
+                    # 리포지토리 업데이트
+                    ai_repo = meta.get("repo_full_name")
+                    if ai_repo and ai_repo in repo_names:
+                        issue.repo_full_name = ai_repo
                     # 라벨 업데이트
                     ai_labels = meta.get("labels", [])
                     if ai_labels and isinstance(ai_labels, list):
@@ -753,6 +792,101 @@ Repository: {full_name}
             issue.ai_plan_status = "failed"
             await db.commit()
 
+    # ── Phase 3: 커밋 히스토리 분석 ──────────────────────────────
+
+    async def analyze_commits(
+        self, repo_id: int, db: AsyncSession, commits_data: List[dict]
+    ) -> None:
+        """커밋 히스토리를 AI로 분석하고 결과를 DB에 저장"""
+        result = await db.execute(
+            select(ConnectedRepo).where(ConnectedRepo.id == repo_id)
+        )
+        repo = result.scalar_one_or_none()
+        if not repo:
+            logger.error("ConnectedRepo not found: id=%d", repo_id)
+            return
+
+        repo.commit_analysis_status = "analyzing"
+        repo.commit_analysis_error = None
+        await db.commit()
+
+        try:
+            prompt = self._build_commit_analysis_prompt(
+                repo.full_name, repo.description, commits_data
+            )
+            analysis = await self._call_gemini(prompt)
+
+            repo.commit_analysis_status = "completed"
+            repo.commit_analysis_result = analysis
+            repo.commit_analysis_error = None
+            repo.commit_analyzed_at = datetime.utcnow()
+            await db.commit()
+
+            logger.info(
+                "커밋 분석 완료: %s (id=%d, 커밋 %d개)",
+                repo.full_name, repo_id, len(commits_data),
+            )
+
+        except Exception as e:
+            logger.exception("커밋 분석 실패: %s (id=%d)", repo.full_name, repo_id)
+            repo.commit_analysis_status = "failed"
+            repo.commit_analysis_error = str(e)[:2000]
+            repo.commit_analyzed_at = datetime.utcnow()
+            await db.commit()
+
+    def _build_commit_analysis_prompt(
+        self,
+        full_name: str,
+        description: Optional[str],
+        commits_data: List[dict],
+    ) -> str:
+        """커밋 히스토리 분석 프롬프트 생성"""
+        commits_section = ""
+        for c in commits_data:
+            stats_info = ""
+            if c.get("stats"):
+                s = c["stats"]
+                stats_info = f" (+{s.get('additions', 0)} -{s.get('deletions', 0)})"
+            commits_section += (
+                f"- [{c.get('author_date', '')}] "
+                f"{c.get('author_name', 'Unknown')} <{c.get('author_email', '')}>\n"
+                f"  {c.get('message', '').split(chr(10))[0]}{stats_info}\n"
+            )
+
+        return f"""You are a senior software engineer analyzing a repository's recent commit history.
+
+Repository: {full_name}
+{f'Description: {description}' if description else ''}
+
+## 최근 커밋 히스토리 ({len(commits_data)}개)
+{commits_section}
+
+## 분석 요청 (한국어로 응답)
+
+위 커밋 히스토리를 분석하여 아래 항목을 마크다운으로 작성하세요:
+
+### 1. 최근 작업 방향 요약
+최근 커밋들이 어떤 방향으로 진행되고 있는지 2-3문장으로 요약하세요.
+
+### 2. 주요 변경 사항 카테고리
+커밋을 카테고리별로 분류하세요 (예: 기능 추가, 버그 수정, 리팩토링, 문서화, 인프라, 테스트 등).
+각 카테고리별 대표 커밋을 예시로 포함하세요.
+
+### 3. 코드 품질/패턴 트렌드
+커밋 메시지와 변경 빈도를 기반으로 코드 품질이나 개발 패턴에 대한 인사이트를 제공하세요.
+- 커밋 메시지 품질
+- 변경 크기 패턴
+- 리팩토링/개선 빈도
+
+### 4. 기여자별 작업 분석
+각 기여자가 어떤 영역에 집중하고 있는지 분석하세요.
+
+### 5. 다음 작업 제안
+현재 작업 흐름을 기반으로 다음에 해야 할 작업 3-5가지를 구체적으로 제안하세요.
+
+**중요**: 모든 텍스트는 한국어로, 구체적이고 실행 가능하게 작성하세요.
+"""
+
     def _parse_deep_response(
         self, raw_response: str
     ) -> tuple[list[dict], str]:
@@ -771,14 +905,19 @@ Repository: {full_name}
                 parsed = json.loads(json_match.group(1))
                 if isinstance(parsed, list):
                     for s in parsed:
-                        if (
-                            isinstance(s, dict)
-                            and s.get("category") in valid_categories
-                            and s.get("severity") in valid_severities
-                            and s.get("title")
-                            and s.get("description")
-                        ):
-                            suggestions.append(s)
+                        if isinstance(s, dict):
+                            # Gemini 2.5 Pro가 대문자로 반환할 수 있으므로 소문자 변환
+                            if s.get("category"):
+                                s["category"] = s["category"].lower()
+                            if s.get("severity"):
+                                s["severity"] = s["severity"].lower()
+                            if (
+                                s.get("category") in valid_categories
+                                and s.get("severity") in valid_severities
+                                and s.get("title")
+                                and s.get("description")
+                            ):
+                                suggestions.append(s)
             except json.JSONDecodeError:
                 logger.warning("심층 분석 JSON 파싱 실패")
 

@@ -1,6 +1,7 @@
 """일감 라우터"""
 import asyncio
 import logging
+from datetime import datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -11,6 +12,7 @@ from src.models.issue import IssueStatus, IssuePriority
 from src.models.issue import Issue as IssueModel
 from src.models.queue_item import QueueItem
 from src.models.user import User
+from src.models.connected_repo import ConnectedRepo
 from src.dependencies import get_issue_service, get_queue_service
 from src.services.issue_service import IssueService
 from src.services.queue_service import QueueService
@@ -62,11 +64,11 @@ async def create_issue(
 ):
     """일감 생성 + AI 작업 계획 자동 생성"""
     issue = await service.create_issue(data)
+    github_token = await _get_github_token(db)
 
     # description이 있으면 AI 작업 계획 백그라운드 생성
     if data.description and data.description.strip():
         issue_id = issue.id
-        github_token = await _get_github_token(db)
 
         # 응답 반환 전에 상태를 generating으로 설정
         issue.ai_plan_status = "generating"
@@ -86,6 +88,56 @@ async def create_issue(
                     )
 
         asyncio.create_task(_generate_plan())
+
+    # 리포가 지정되었고 커밋 분석이 오래되었거나 없으면 백그라운드 갱신
+    if data.repo_full_name:
+        repo_full_name = data.repo_full_name
+
+        async def _refresh_commit_analysis():
+            async with async_session_maker() as bg_db:
+                try:
+                    result = await bg_db.execute(
+                        select(ConnectedRepo).where(
+                            ConnectedRepo.full_name == repo_full_name
+                        )
+                    )
+                    repo = result.scalar_one_or_none()
+                    if not repo:
+                        return
+
+                    # 분석 중이면 스킵
+                    if repo.commit_analysis_status == "analyzing":
+                        return
+
+                    # 미분석이거나 1시간 이상 경과하면 갱신
+                    is_stale = (
+                        repo.commit_analysis_status is None
+                        or repo.commit_analyzed_at is None
+                        or (datetime.utcnow() - repo.commit_analyzed_at) > timedelta(hours=1)
+                    )
+                    if not is_stale:
+                        return
+
+                    if not github_token:
+                        return
+
+                    github_api = GitHubAPIService(github_token)
+                    owner, repo_name = repo_full_name.split("/", 1)
+                    commits_data = await github_api.get_commits(
+                        owner, repo_name, per_page=30
+                    )
+                    if commits_data:
+                        gemini_service = GeminiAnalysisService(github_api)
+                        await gemini_service.analyze_commits(
+                            repo.id, bg_db, commits_data
+                        )
+                except Exception:
+                    logger.exception(
+                        "일감 생성 커밋 분석 갱신 실패: repo=%s",
+                        repo_full_name,
+                    )
+
+        asyncio.create_task(_refresh_commit_analysis())
 
     return _enrich_issue_response(issue)
 

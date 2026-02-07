@@ -32,6 +32,8 @@ export function CreateIssueModal({ open, onClose, onSubmit }: CreateIssueModalPr
         description: description.trim(),
         repo_full_name: repoFullName || undefined,
       });
+      setDescription('');
+      setRepoFullName('');
     } finally {
       setLoading(false);
     }
@@ -68,7 +70,7 @@ export function CreateIssueModal({ open, onClose, onSubmit }: CreateIssueModalPr
               onChange={(e) => setRepoFullName(e.target.value)}
               className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 bg-white"
             >
-              <option value="">리포지토리를 선택하세요 (선택)</option>
+              <option value="">AI가 자동 선택 (또는 직접 선택)</option>
               {repos.map((repo) => (
                 <option key={repo.id} value={repo.full_name}>
                   {repo.full_name}
@@ -82,7 +84,7 @@ export function CreateIssueModal({ open, onClose, onSubmit }: CreateIssueModalPr
         <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 rounded-lg border border-purple-100">
           <Sparkles className="w-4 h-4 text-purple-500 shrink-0" />
           <p className="text-xs text-purple-600">
-            AI가 제목, 우선순위, 카테고리, 작업 계획을 자동으로 생성합니다.
+            AI가 제목, 우선순위, 카테고리, 리포지토리, 작업 계획을 자동으로 생성합니다.
           </p>
         </div>
 

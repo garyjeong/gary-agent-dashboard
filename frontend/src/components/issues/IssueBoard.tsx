@@ -22,6 +22,7 @@ import { fetcher } from '@/lib/fetcher';
 import { IssueColumn } from './IssueColumn';
 import { IssueCard } from './IssueCard';
 import { IssueModal } from './IssueModal';
+import { CreateIssueModal } from './CreateIssueModal';
 import { IssueDetailModal } from './IssueDetailModal';
 import { useToast, Pagination } from '@/components/ui';
 import { issueService } from '@/services/issueService';
@@ -400,12 +401,11 @@ export const IssueBoard = forwardRef<IssueBoardRef>(function IssueBoard(_, ref) 
       <Pagination currentPage={page} totalPages={totalPages} onPageChange={handlePageChange} />
 
       {/* 생성 모달 */}
-      {modalOpen && (
-        <IssueModal
-          onClose={() => setModalOpen(false)}
-          onSubmit={handleCreate}
-        />
-      )}
+      <CreateIssueModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSubmit={handleCreate}
+      />
 
       {/* 수정 모달 */}
       {editingIssue && (

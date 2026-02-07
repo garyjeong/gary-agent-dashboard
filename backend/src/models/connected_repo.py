@@ -51,6 +51,14 @@ class ConnectedRepo(Base):
     deep_analysis_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     deep_analyzed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
+    # 커밋 히스토리 분석 (Phase 3)
+    commit_analysis_status: Mapped[Optional[str]] = mapped_column(
+        String(20), default=None, nullable=True
+    )
+    commit_analysis_result: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    commit_analysis_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    commit_analyzed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
     # 관계
     deep_analysis_suggestions: Mapped[List["DeepAnalysisSuggestion"]] = relationship(
         "DeepAnalysisSuggestion",
