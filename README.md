@@ -131,6 +131,7 @@ npm run dev
 | `REFRESH_TOKEN_EXPIRE_DAYS` | 리프레시 토큰 만료 시간 (일) | `7` |
 | `GITHUB_CLIENT_ID` | GitHub OAuth 앱 Client ID | |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth 앱 Client Secret | |
+| `GEMINI_API_KEY` | Google Gemini API Key | |
 | `API_KEY` | 큐 API 인증용 API Key | |
 | `TELEGRAM_BOT_TOKEN` | 텔레그램 봇 토큰 | |
 | `TELEGRAM_CHAT_ID` | 텔레그램 채팅 ID | |
@@ -206,11 +207,15 @@ DELETE /api/issues/{id}
 ### 작업 큐 관리
 
 ```bash
-# 작업 요청 등록 (일감을 큐에 추가)
+# 작업 요청 등록 (일감을 큐에 추가, 담당 에이전트 타입 지정 가능)
 POST /api/issues/{id}/work-request
+Content-Type: application/json
+{
+  "assigned_agent_type": "claude_code"   # 선택: gemini_pro, claude_code 등
+}
 
-# 다음 처리할 큐 항목 조회 (에이전트/워커 전용)
-GET /api/queue/next
+# 다음 처리할 큐 항목 조회 (에이전트/워커 전용, agent_type 필터)
+GET /api/queue/next?agent_type=claude_code
 X-API-Key: {api_key}
 
 # 큐 항목 상태 업데이트
@@ -221,6 +226,10 @@ Content-Type: application/json
   "status": "completed",
   "result": "PR #42 생성 완료"
 }
+
+# 워커용 리포 분석 결과 조회 (기본 분석 + 심층 분석)
+GET /api/queue/repo-analysis/{owner}/{repo}
+X-API-Key: {api_key}
 
 # 큐 통계 조회
 GET /api/queue/stats
@@ -262,7 +271,8 @@ gary-agent-dashboard/
 │   │   ├── models/           # SQLAlchemy ORM 모델
 │   │   │   ├── issue.py      # 일감 모델
 │   │   │   ├── label.py      # 라벨 모델
-│   │   │   ├── queue_item.py # 큐 항목 모델
+│   │   │   ├── connected_repo.py # 연결된 리포 + 분석 결과 모델
+│   │   │   ├── queue_item.py # 큐 항목 모델 (assigned_agent_type 포함)
 │   │   │   ├── setting.py    # 설정 모델
 │   │   │   └── user.py       # 사용자 모델
 │   │   ├── schemas/          # Pydantic 스키마 (요청/응답)
@@ -285,6 +295,7 @@ gary-agent-dashboard/
 │   │   │   └── queue_repository.py
 │   │   ├── services/         # 비즈니스 로직
 │   │   │   ├── behavior_generator.py  # 동작 예시 자동 생성
+│   │   │   ├── gemini_service.py      # Gemini AI 분석 (Flash/Pro)
 │   │   │   ├── github_service.py      # GitHub API 연동
 │   │   │   ├── issue_service.py       # 일감 비즈니스 로직
 │   │   │   ├── queue_service.py       # 큐 비즈니스 로직
@@ -348,11 +359,13 @@ gary-agent-dashboard/
 ## 핵심 흐름
 
 1. **GitHub OAuth 로그인** -- 사용자가 GitHub 계정으로 인증합니다.
-2. **일감 생성** -- 대시보드에서 일감 카드를 생성하면, 연결된 GitHub 프로젝트 구조를 분석하여 동작 예시를 자동 생성합니다.
-3. **드래그 앤 드롭** -- 일감 카드를 드래그하여 상태를 변경합니다 (Todo -> In Progress -> Done).
-4. **작업 요청** -- 일감에 대한 작업 요청을 등록하면 작업 큐에 추가됩니다.
-5. **에이전트 처리** -- 로컬 워커가 큐에서 일감을 가져와 Claude Code/Cursor Agent로 자동 처리합니다.
-6. **텔레그램 알림** -- 작업 완료 시 설정된 텔레그램 봇으로 알림을 발송합니다.
+2. **프로젝트 연결 + 기본 분석** -- GitHub 리포를 연결하면 **Gemini Flash**가 리포 트리·주요 파일을 자동 분석합니다.
+3. **심층 분석** -- **Gemini Pro**가 소스 코드 품질/보안/성능을 분석하고 개선 제안을 생성합니다.
+4. **일감 생성** -- 대시보드에서 일감 카드를 생성하면, **Gemini Flash**가 프로젝트 구조를 기반으로 작업 계획(동작 예시)을 자동 생성합니다.
+5. **드래그 앤 드롭** -- 일감 카드를 드래그하여 상태를 변경합니다 (Todo -> In Progress -> Done).
+6. **작업 요청** -- 일감에 대한 작업 요청을 등록하면, 담당 에이전트 타입(`assigned_agent_type`)과 함께 작업 큐에 추가됩니다.
+7. **에이전트 처리** -- 로컬 워커가 `agent_type` 필터로 자신의 큐 항목을 가져와 **Claude Code**로 자동 처리합니다.
+8. **텔레그램 알림** -- 작업 완료 시 설정된 텔레그램 봇으로 알림을 발송합니다.
 
 ---
 

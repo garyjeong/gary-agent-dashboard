@@ -38,8 +38,9 @@
 ### 2.3 작업 요청·큐
 
 - 일감에 **「작업 요청」** 버튼/액션으로 “에이전트가 할 일”을 등록.
-- 등록 시 **작업 큐(백엔드)** 에 항목 추가: 일감 ID, 요청 내용, 우선순위, 생성 시각 등.
-- (선택) 큐 항목 상태: 대기 / 처리중 / 완료 / 실패.
+- 등록 시 **작업 큐(백엔드)** 에 항목 추가: 일감 ID, 요청 내용, 우선순위, **담당 에이전트 타입(`assigned_agent_type`)**, 생성 시각 등.
+- 큐 항목 상태: 대기 / 처리중 / 완료 / 실패.
+- **담당 에이전트**: `gemini_pro` 또는 `claude_code`. 미지정 시 워커 설정 기본값 사용.
 
 ### 2.4 GitHub 연동 — 다중 프로젝트 관리
 
@@ -54,15 +55,25 @@
 - **알림 템플릿**을 **대시보드에서 사용자가 수정**할 수 있다.
   - 예: 제목/본문 포맷, 치환 변수(일감 제목, 상태, 완료 시각, 링크 등). 저장 시 해당 템플릿으로 봇 메시지가 전송된다.
 
-### 2.6 에이전트 연동(자동 처리)
+### 2.6 AI 분석 파이프라인 (담당 모델 구분)
+
+| 단계 | 담당 모델 | 역할 |
+|------|-----------|------|
+| 프로젝트 등록·기본 분석 | **Gemini Flash** | 리포 트리·주요 파일 분석, 요약 생성 |
+| 심층 분석 | **Gemini Pro** | 소스 코드 품질/보안/성능 분석, 개선 제안 |
+| 일감 생성 분석 | **Gemini Flash** | 제목·우선순위·라벨·리포 추천, 작업 계획(behavior_example) 생성 |
+| 일감 수행 | **Gemini Pro** 또는 **Claude Code** | 실제 코드 변경·커밋·PR (큐 항목별 `assigned_agent_type` 지정) |
+
+### 2.7 에이전트 연동(자동 처리)
 
 - **서버에서 할 수 있는 것**
-  - 큐 API 제공: “다음 할 일” 조회, 상태 업데이트(처리중/완료/실패).
-  - (선택) **Anthropic/OpenAI 등 LLM API**를 서버에서 호출해 “일감 설명 기반 코드 생성·요약” 등 텍스트 작업 수행. 결과를 일감에 코멘트/필드로 저장.
-- **로컬 에이전트(Claude Code / Cursor Agent)와 연동**
-  - Claude Code / Cursor Agent는 **서버 프로세스로 직접 실행 불가**. 따라서 **로컬(또는 전용 머신) 워커**가 백엔드의 **큐 API를 폴링**해 “다음 일감”을 가져가고, 로컬에서 에이전트/스크립트를 실행한 뒤, 결과를 같은 API로 업데이트하는 방식으로 구현.
+  - 큐 API 제공: "다음 할 일" 조회(`GET /api/queue/next?agent_type=...`), 상태 업데이트.
+  - **Gemini API**를 서버에서 호출해 리포 분석·일감 작업 계획 생성. 결과를 일감에 필드로 저장.
+- **로컬 에이전트(Claude Code)와 연동**
+  - 워커가 `GET /api/queue/next?agent_type=claude_code`로 자신의 타입에 배정된 큐 항목만 폴링.
+  - `GET /api/queue/repo-analysis/{full_name}`으로 기본+심층 분석 결과 수신.
+  - 완료 후 `PATCH /api/queue/:id`로 결과·상태 전송.
 - 큐 항목이 **완료**로 업데이트되면, 2.5에 따라 **텔레그램 알림**을 발송한다(저장된 템플릿 사용).
-
 ---
 
 ## 3. 구현 방식
@@ -72,21 +83,22 @@
 - **프론트엔드**: Jira형 대시보드(일감 목록·상세·생성·수정·필터·정렬, **여러 GitHub 프로젝트 선택/관리**, 작업 요청 버튼, **텔레그램 알림 템플릿 편집 UI**).
 - **백엔드**: REST(또는 GraphQL) API 서버. 인증, 일감 CRUD, **일감 생성 시 동작 예시 생성**, 작업 큐, GitHub OAuth·API 프록시, **텔레그램 봇 발송·템플릿 저장**, **다중 리포 관리**.
 - **DB**: 사용자, 일감(동작 예시 필드 포함), 큐 항목, **알림 템플릿**, (선택) 댓글/이력 저장.
-- **에이전트 연동**: 큐 소비 API + (선택) 서버 측 LLM 호출; 완료 시 텔레그램 알림. Cursor/Claude Code 연동은 로컬 워커가 큐 소비.
+- **에이전트 연동**: 큐 소비 API(`agent_type` 필터 지원) + 서버 측 Gemini Flash/Pro 호출; 완료 시 텔레그램 알림. Claude Code 연동은 로컬 워커가 큐 소비.
 
-### 3.2 기술 스택(가이드)
+### 3.2 기술 스택
 
-- **프론트**: React/Next.js 등 SPA 또는 SSR. 대시보드 UI, 테이블·필터·폼.
-- **백엔드**: Node(Nest/Express) 또는 Python(FastAPI) 등. 라우터, 서비스, DB 접근 계층 분리.
-- **DB**: PostgreSQL 또는 SQLite 등. 일감·큐·사용자 테이블 스키마 설계.
-- **인증**: 세션 또는 JWT. GitHub OAuth는 백엔드에서 토큰 받아 저장, API 호출 시 사용.
-- **큐**: DB 테이블 기반 큐(상태·우선순위·created_at)로 1차 구현; 필요 시 Redis 등 도입.
+- **프론트**: Next.js 16 + React 19 + TypeScript + Tailwind CSS + SWR + Zustand + @dnd-kit.
+- **백엔드**: Python 3.12 + FastAPI + SQLAlchemy(비동기) + Pydantic. **명시적 매개변수**(키워드 인자) 사용 원칙.
+- **DB**: PostgreSQL 16. 일감·큐(`assigned_agent_type` 포함)·사용자·리포 분석 테이블.
+- **AI 분석**: Gemini Flash(기본/일감 분석), Gemini Pro(심층 분석/일감 수행).
+- **인증**: JWT + 리프레시 토큰. GitHub OAuth로 토큰 발급, Fernet으로 암호화 저장.
+- **큐**: DB 테이블 기반 큐(상태·우선순위·`assigned_agent_type`·created_at). `with_for_update(skip_locked)` 동시 처리 지원.
 
 ### 3.3 API 설계(핵심)
 
 - `GET/POST /issues` — 일감 목록(쿼리: 상태, 우선순위 등), 일감 생성.
 - `GET/PATCH/DELETE /issues/:id` — 일감 상세, 수정, 삭제.
-- `POST /issues/:id/work-request` — 해당 일감에 대한 작업 요청 등록(큐에 추가).
+- `POST /issues/:id/work-request` — 해당 일감에 대한 작업 요청 등록(큐에 추가). 본문에 `assigned_agent_type` 지정 가능.
 - `GET /queue/next` — (에이전트/워커용) 다음 처리할 큐 항목 조회, 상태를 “처리중”으로 변경.
 - `PATCH /queue/:id` — 큐 항목 상태·결과 업데이트(완료/실패, 결과 본문 등).
 - `GET /github/repos`, `GET /github/repos/:owner/:repo/issues` — GitHub 연동(프록시 또는 백엔드에서 토큰으로 호출). 일감 목록/생성 시 `repo`(또는 `projectId`)로 **다중 프로젝트** 구분.
@@ -119,6 +131,7 @@
 - **기능**
   - 사용자·GitHub OAuth, **다중 리포 관리**, 일감 CRUD·필터·정렬.
   - **일감 카드 생성 시**: 내용·프로젝트 구조 파악 → **동작 추론·동작 예시** 생성 후 카드에 포함.
-  - 작업 요청·큐, 큐 소비 API, (선택) 서버 측 LLM 호출.
+  - 작업 요청·큐(`assigned_agent_type` 지정), 큐 소비 API, 서버 측 Gemini Flash/Pro 호출.
   - **일감 완료 시 텔레그램 봇 알림**; **알림 템플릿은 대시보드에서 사용자 수정 가능**.
-- **구현**: 프론트(대시보드 + 템플릿 편집 + 다중 프로젝트 UI) + 백엔드(API·DB·큐·GitHub·텔레그램·동작 예시 생성) + 로컬 워커(큐 폴링 후 Cursor/Claude Code에서 처리).
+- **AI 분석 파이프라인**: 기본 분석(Flash) → 심층 분석(Pro) → 일감 생성 분석(Flash) → 일감 수행(Pro/Claude Code, 큐 항목별 지정).
+- **구현**: 프론트(대시보드 + 템플릿 편집 + 다중 프로젝트 UI) + 백엔드(API·DB·큐·GitHub·텔레그램·Gemini AI 분석) + 로컬 워커(큐 폴링 후 Claude Code에서 처리).

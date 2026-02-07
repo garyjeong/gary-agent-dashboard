@@ -265,6 +265,7 @@
 | MEDIUM | 테스트 | 단위 테스트, E2E 테스트 |
 | LOW | 문서화 | API 문서, README |
 | LOW | 타입 안전성 | 타입 정의 강화 |
+| **NEW** | AI 분석 파이프라인 | 담당 모델 구분, agent_type 필터, 명시적 매개변수 |
 
 ---
 
@@ -315,6 +316,38 @@
 - [x] `/github` 페이지: 리포지토리 목록, 카드 그리드 UI
 - [x] `/issues` 페이지: 일감 테이블 뷰 (칸반 외 목록 형태)
 - **파일**: `frontend/src/app/github/page.tsx`, `frontend/src/app/issues/page.tsx`
+
+---
+
+## 12. AI 분석 파이프라인 및 담당 모델 구분 (NEW)
+
+> 프로젝트 분석 4단계 + 담당 모델 배정 + 명시적 매개변수 적용
+
+### 12.1 담당 모델 배정 체계
+- [x] Gemini Flash: 기본 분석(`analyze_repo`) 담당 — `gemini_service.py`
+- [x] Gemini Pro: 심층 분석(`analyze_repo_deep`) 담당 — `gemini_service.py`
+- [x] Gemini Flash: 일감 생성 분석(`generate_work_plan`) 담당 — `gemini_service.py`
+- [x] `assigned_agent_type` 컬럼 추가 (`queue_items` 테이블) — `models/queue_item.py`
+- [x] DB 마이그레이션 스크립트 — `backend/scripts/add_assigned_agent_type.sql`
+
+### 12.2 큐 API agent_type 필터링
+- [x] `GET /api/queue/next?agent_type=...` 쿼리 파라미터 지원 — `routes/queue.py`
+- [x] `QueueRepository.get_next_pending`에 `agent_type` 필터 추가 — `repositories/queue_repository.py`
+- [x] `QueueService.get_next_item`에 `agent_type` 전달 — `services/queue_service.py`
+- [x] 작업 요청 시 `assigned_agent_type` 지정 — `routes/issues.py`, `schemas/queue.py`
+
+### 12.3 워커 연동 개선
+- [x] 워커가 `agent_type` 파라미터로 큐 폴링 — `worker/main.py`
+- [x] `api_client.get_next_queue_item`에 `agent_type` 전달 — `worker/api_client.py`
+- [x] 기본 분석 + 심층 분석 결과 통합 수신 — `worker/api_client.py`
+- [x] `GET /api/queue/repo-analysis/{full_name}`에 심층 분석 결과 포함 — `routes/queue.py`
+
+### 12.4 명시적 매개변수 (키워드 인자)
+- [x] `gemini_service.py` 내부 `_call_gemini()` 호출 키워드 인자 적용
+- [x] `queue_service.py` 모든 내부 호출 키워드 인자 적용
+- [x] `routes/github.py` 분석 호출 키워드 인자 적용
+- [x] AGENTS.md에 명시적 매개변수 규칙 문서화
+- **파일**: `AGENTS.md`, `docs/PLAN-project-analysis-and-assigned-model.md`
 
 ---
 

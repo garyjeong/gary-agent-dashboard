@@ -65,6 +65,7 @@ gary-agent-dashboard/
 
 - **ORM 우선**: Raw Query는 성능 목적일 때만, 사유 명시.
 - **패턴 준수**: Repository, Service, DTO, DI(생성자 주입) 기반 구조.
+- **명시적 매개변수**: Python 함수/메서드 호출 시 **키워드 인자** 사용 원칙. 예: `create_issue(data=issue_create)`, `get_list(status=status_filter, skip=skip, limit=limit)`. 정의부에서 필요 시 `*` 로 키워드 전용 인자 강제.
 - 트랜잭션 단위 명확히, 커밋/롤백 경계 분리.
 - GitHub 토큰·API 키·텔레그램 봇 토큰은 환경변수/시크릿 저장소에만 보관.
 
@@ -75,34 +76,49 @@ gary-agent-dashboard/
 
 ---
 
-## 4. 에이전트 작업 흐름
+## 4. 담당 모델 구분
 
-### 4.1 큐에서 일감 가져오기
+| 단계 | 담당 모델 | 역할 |
+|------|-----------|------|
+| 프로젝트 등록·기본 분석 | **Gemini Flash** (서버) | 리포 트리·주요 파일 분석, 요약 생성 |
+| 심층 분석 | **Gemini Pro** (서버) | 소스 코드 품질/보안/성능 분석, 제안 생성 |
+| 일감 생성 분석 | **Gemini Flash** (서버) | 제목·우선순위·라벨·리포 추천, 작업 계획 생성 |
+| 일감 수행 | **Gemini Pro** 또는 **Claude Code** | 실제 코드 변경·커밋·PR (큐 항목별 `assigned_agent_type` 지정) |
 
-1. `GET /queue/next` 호출 → 다음 처리할 큐 항목 수신(상태가 "처리중"으로 변경됨).
+---
+
+## 5. 에이전트 작업 흐름
+
+### 5.1 큐에서 일감 가져오기
+
+1. `GET /api/queue/next?agent_type=claude_code` 호출 → 해당 타입(또는 미배정)의 큐 항목 수신(상태가 "처리중"으로 변경됨).
 2. 응답 예시:
    ```json
    {
-     "id": "queue-123",
-     "issueId": "issue-456",
-     "title": "로그인 API 버그 수정",
-     "description": "...",
-     "behaviorExample": "1. src/routes/auth.ts 수정\n2. 테스트 실행\n3. PR 생성",
-     "repo": "garyjeong/some-project",
-     "priority": "high",
-     "status": "in_progress"
+     "id": 123,
+     "issue_id": 456,
+     "status": "in_progress",
+     "priority": 2,
+     "assigned_agent_type": "claude_code",
+     "issue": {
+       "title": "로그인 API 버그 수정",
+       "description": "...",
+       "behavior_example": "### 작업 계획\n1. ...",
+       "repo_full_name": "garyjeong/some-project"
+     }
    }
    ```
 
-### 4.2 작업 수행
+### 5.2 작업 수행
 
-- **behaviorExample** 필드를 참고해 작업 순서·범위 결정.
+- **behavior_example** 필드(AI 자동 생성 작업 계획)를 참고해 작업 순서·범위 결정.
+- `GET /api/queue/repo-analysis/{full_name}` 으로 기본 분석 + 심층 분석 결과를 추가로 수신.
 - 필요 시 해당 GitHub 리포를 clone/pull 후 브랜치 생성.
 - 코드 수정 → (요청 시) 테스트 → 커밋 → (요청 시) PR 생성.
 
-### 4.3 완료 보고
+### 5.3 완료 보고
 
-1. 작업 완료 후 `PATCH /queue/:id` 호출:
+1. 작업 완료 후 `PATCH /api/queue/:id` 호출:
    ```json
    {
      "status": "completed",
@@ -120,7 +136,7 @@ gary-agent-dashboard/
 
 ---
 
-## 5. 커밋·브랜치 규칙
+## 6. 커밋·브랜치 규칙
 
 - **브랜치 네이밍**: `feature/<issue-id>-<짧은설명>`, `fix/<issue-id>-<짧은설명>` 등.
 - **커밋 메시지**: 한국어 요약 1줄 + (선택) 본문.
@@ -129,7 +145,7 @@ gary-agent-dashboard/
 
 ---
 
-## 6. 주의사항
+## 7. 주의사항
 
 - **시크릿 노출 금지**: 코드/로그/커밋에 토큰·API 키·PII 포함하지 않는다.
 - **추측 구현 금지**: 정보가 부족하면 질문하거나, 큐 API로 "실패" 상태 + 사유 반환.
@@ -138,11 +154,11 @@ gary-agent-dashboard/
 
 ---
 
-## 7. 로컬 워커 실행 가이드
+## 8. 로컬 워커 실행 가이드
 
-로컬 워커는 백엔드의 작업 큐를 폴링하여 에이전트(Claude Code/Cursor)로 작업을 처리합니다.
+로컬 워커는 백엔드의 작업 큐를 폴링하여 담당 에이전트(Claude Code 등)로 작업을 처리합니다.
 
-### 7.1 설치
+### 8.1 설치
 
 ```bash
 cd worker
@@ -152,7 +168,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-### 7.2 설정 (.env)
+### 8.2 설정 (.env)
 
 ```bash
 # 백엔드 API URL
@@ -161,14 +177,14 @@ API_BASE_URL=http://localhost:8000
 # 폴링 간격 (초)
 POLL_INTERVAL=5
 
-# 에이전트 타입: claude_code 또는 cursor
+# 에이전트 타입: claude_code, gemini_pro 등 (큐 항목 필터링에 사용)
 AGENT_TYPE=claude_code
 
 # 작업 디렉토리 (리포 클론 위치)
 WORK_DIR=./workspaces
 ```
 
-### 7.3 실행
+### 8.3 실행
 
 ```bash
 cd worker
@@ -176,18 +192,19 @@ source venv/bin/activate
 python main.py
 ```
 
-### 7.4 동작 흐름
+### 8.4 동작 흐름
 
-1. 워커가 `GET /api/queue/next`를 주기적으로 폴링
-2. 대기 중인 작업이 있으면 가져옴 (상태가 `in_progress`로 변경)
-3. 리포지토리가 지정된 경우 클론/풀
-4. 에이전트(Claude Code/Cursor)에게 작업 프롬프트 전달
+1. 워커가 `GET /api/queue/next?agent_type={AGENT_TYPE}`를 주기적으로 폴링
+2. 해당 타입에 배정된(또는 미배정) 대기 작업이 있으면 가져옴 (상태가 `in_progress`로 변경)
+3. 리포지토리가 지정된 경우 클론/풀, 기본+심층 분석 결과를 `repo-analysis` API로 수신
+4. 에이전트(Claude Code 등)에게 작업 프롬프트 + 분석 컨텍스트 전달
 5. 완료 후 `PATCH /api/queue/{id}`로 결과 업데이트
 6. 백엔드가 텔레그램 알림 발송
 
 ---
 
-## 8. 참고 문서
+## 9. 참고 문서
 
 - [PROJECT.md](./PROJECT.md) — 프로젝트 목적, 기능 정의, 구현 방식 상세.
 - [TODO.md](./TODO.md) — 구현 진행 상황 및 체크리스트.
+- [docs/PLAN-project-analysis-and-assigned-model.md](./docs/PLAN-project-analysis-and-assigned-model.md) — 담당 모델 구분 및 분석 단계 계획.
